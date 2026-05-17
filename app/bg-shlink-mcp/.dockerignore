@@ -33,6 +33,3 @@ Thumbs.db
 
 *.log
 *.pid
-
-# Per-image readme is published separately
-README.md
