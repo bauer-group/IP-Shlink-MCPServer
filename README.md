@@ -187,6 +187,7 @@ IP-Shlink-MCPServer/
 - [docs/installation.md](docs/installation.md) — step-by-step deploy for each flavour
 - [docs/authentication.md](docs/authentication.md) — full walkthroughs for Entra (single/multi), Google, generic OIDC
 - [docs/client-setup.md](docs/client-setup.md) — adding the connector in each AI client
+- [docs/testing.md](docs/testing.md) — local & remote testing with MCP Inspector (GUI + CLI)
 - [docs/tools.md](docs/tools.md) — auto-generated catalogue of MCP tools
 - [docs/troubleshooting.md](docs/troubleshooting.md) — common errors & fixes
 - [docs/SHLINK-MCP-SPEC.md](docs/SHLINK-MCP-SPEC.md) — design specification (source of truth)

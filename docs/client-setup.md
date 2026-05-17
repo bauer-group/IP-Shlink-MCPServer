@@ -128,20 +128,21 @@ Continue handles the OAuth flow on first invocation.
 
 ---
 
-## Self-Test with `mcp-inspector`
+## Self-Test with MCP Inspector
 
-For development without any of the GUI clients above:
+For development without any of the GUI clients above — or before pointing
+real clients at a fresh deployment — use the official MCP Inspector:
 
 ```bash
-npx @modelcontextprotocol/inspector --url https://<your-host>/mcp
+npx @modelcontextprotocol/inspector
 ```
 
-This opens a local web UI where you can:
-- Drive the OAuth dance manually
-- Browse the auto-generated tool list
-- Send `tools/list`, `tools/call`, and `resources/read` requests directly
+It opens a local web UI on `http://localhost:6274` where you can drive the
+OAuth dance, browse the auto-generated tool list, and send `tools/list`,
+`tools/call`, and `resources/read` requests directly.
 
-Useful for verifying a new deployment before pointing real clients at it.
+Full walkthrough — local stdio, local HTTP, remote OAuth-gated, headless
+CI mode — in [testing.md](testing.md).
 
 ---
 
