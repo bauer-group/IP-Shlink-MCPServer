@@ -256,7 +256,73 @@ boot, so per-user strategies just work.
 
 ---
 
-## 5 · An incremental path that doesn't break the current product
+## 5 · Existing landscape — what already exists, and what's still maintained
+
+Before committing to any phase below, an honest build-vs-buy check. This
+list is filtered for **active maintenance** (last push within ~6 months) —
+abandoned projects in the OpenAPI-to-MCP space outnumber maintained ones,
+and recommending one that has been stale for a year is worse than
+recommending none.
+
+### 5.1 · Open source — actively maintained
+
+| Project | Last activity | Sweet spot | License |
+|---|---|---|---|
+| **[jlowin/fastmcp](https://github.com/jlowin/fastmcp)** | active (current week) | Python library with `from_openapi()`. What `bg-shlink-mcp` is built on. Single-tenant per default; multi-mount supported. ~25k ⭐. | Apache-2.0 |
+| **[modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)** | active (current week) | Reference servers from Anthropic. Not a generic bridge, but the canonical pattern collection — read before designing your own. ~86k ⭐. | MIT |
+| **[awslabs/mcp](https://github.com/awslabs/mcp)** | active (current week) | AWS-Labs OpenAPI MCP Server: dynamically generates MCP tools/resources from any OpenAPI spec. Operationally the closest to "drop in a spec, get an MCP". ~9k ⭐. | Apache-2.0 |
+| **[harsha-iiiv/openapi-mcp-generator](https://github.com/harsha-iiiv/openapi-mcp-generator)** | active (this month) | **Code-generation** path (CLI: OpenAPI in → MCP-server code out) rather than runtime bridge. Choose this if you want a self-contained generated server you can hand-modify. ~580 ⭐. | MIT |
+
+### 5.2 · Managed / commercial
+
+SaaS pipeline activity is not directly measurable from a single git
+repository — judge by public release cadence and product activity, not
+pushed_at on a single repo.
+
+| Platform | What it solves | Notes |
+|---|---|---|
+| **[Gram (Speakeasy)](https://www.speakeasy.com/product/gram)** | Hosted OpenAPI → MCP with built-in OAuth + API-key management, observability, gateway. | Closest match to this entire vision doc, as a product. Source available at [speakeasy-api/gram](https://github.com/speakeasy-api/gram) (active). Gateway GA'd March 2026. |
+| **[Stainless](https://www.stainless.com/mcp/from-rest-api-to-mcp-server)** | REST → MCP code generation in the Stainless SDK pipeline. | Strong fit if you already use Stainless for client SDKs. |
+| **[DigitalAPI](https://www.digitalapi.ai/blogs/convert-openapi-specs-into-mcp-server)** | "Upload OpenAPI → get an MCP server" UI. | Lowest-friction managed onboarding. |
+| **[DreamFactory](https://blog.dreamfactory.com/postgresql-mcp-server)** | Auto-REST-from-database + MCP server with multiple inbound auth modes (OAuth/OIDC/Entra/SAML/LDAP). | Wider scope: this is "make any DB an MCP", not just "make any OpenAPI an MCP". |
+
+### 5.3 · Notable absences (intentionally removed)
+
+Several projects appear in older blog posts and listicles but have had no
+commits since H1 2025 — **don't adopt these without checking their repo
+yourself first**:
+
+- `conorbranagan/mcp-openapi` — last push March 2025.
+- `ephrin/openapi-mcp-bridge` — last push July 2025.
+- `super-i-tech/mcp_plexus` — last push June 2025. *(Especially notable
+  because its multi-tenant + OAuth 2.1 design was closest to phases 1–4 of
+  this doc. Worth reading the source as a reference even if not adopting.)*
+
+The MCP ecosystem moves fast and several "obvious" search hits are
+abandoned 6–12 month old experiments. Re-verify maintenance status before
+recommending any of these to a team.
+
+### 5.4 · Build-vs-buy summary
+
+| You want… | Use |
+|---|---|
+| Self-host, full control, willing to maintain | `bg-mcp-bridge` (this vision, phases 0–N) or build on `awslabs/mcp` |
+| Self-host, minimal code, single-tenant per upstream | `jlowin/fastmcp` directly (what we already do) |
+| Generated, hand-modifiable server per API | `harsha-iiiv/openapi-mcp-generator` |
+| Managed, OAuth + observability done for you | `Gram (Speakeasy)` |
+| Existing Stainless SDK pipeline | `Stainless` |
+| Database-to-MCP shortcut | `DreamFactory` |
+
+The honest assessment for our position: if the only upstream is Shlink,
+none of the above wins over the current `bg-shlink-mcp` setup. If a second
+upstream lands and the team can't accept a SaaS dependency, the choice
+is between **building Phase 0 on top of our current code** versus
+**rebasing on `awslabs/mcp`**. That decision is worth ~1 day of prototyping
+both before committing.
+
+---
+
+## 6 · An incremental path that doesn't break the current product
 
 Each phase is independently shippable and reversible. Don't do them all at
 once.
@@ -279,7 +345,7 @@ a platform.
 
 ---
 
-## 6 · Naming and positioning
+## 7 · Naming and positioning
 
 If we go past Phase 1, the product is no longer `bg-shlink-mcp`. Likely
 shape:
@@ -295,7 +361,7 @@ single-profile preset). No one is forced to migrate.
 
 ---
 
-## 7 · Recommendation
+## 8 · Recommendation
 
 **Do Phase 0 now, only if a second upstream is on the horizon.** Phase 0
 is a clean refactor with no operational risk, and it removes the
