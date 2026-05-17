@@ -4,14 +4,13 @@ dev-inspector.py — MCP debugging via Inspector (local + remote).
 
 Three modes under one script:
 
-  default (local stdio):  docker run -i + Inspector, AUTH_MODE=none
-  --http <PORT>          : local container detached on host port, Inspector GUI
+  default (local stdio):  build image, docker run -i + Inspector, AUTH_MODE=none
+  --http <PORT>          : build image, detached on host port, Inspector GUI
   --remote <URL>         : preflight-probe deployed instance, then Inspector GUI
 
-Local modes build the image from your working tree on every run so the server
-under test reflects your current code — that's the whole point of local dev.
-Use --published to test the released GHCR build instead, or --no-build to
-reuse the last local build when you know nothing changed.
+Local modes always build the image from your working tree (same build
+command shape as docker-compose.development.yml: target=production, with
+the SHLINK_OPENAPI_VERSION passthrough) and then run it.
 
 The local modes need a populated .env (SHLINK_URL + SHLINK_API_KEY).
 The remote mode needs only the URL — the deployed server owns its own config.
@@ -19,8 +18,6 @@ The remote mode needs only the URL — the deployed server owns its own config.
 Examples:
   python scripts/dev-inspector.py
   python scripts/dev-inspector.py --http --port 8000
-  python scripts/dev-inspector.py --no-build               # reuse cached build
-  python scripts/dev-inspector.py --published              # test GHCR :latest
   python scripts/dev-inspector.py --network bg-shlink-mcp
   python scripts/dev-inspector.py --remote https://shlink-mcp.example.com/mcp
 """
@@ -38,13 +35,23 @@ import urllib.request
 from pathlib import Path
 
 
-DEFAULT_LOCAL_IMAGE = "bg-shlink-mcp:dev"
-PUBLISHED_IMAGE = "ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp:latest"
+LOCAL_IMAGE = "bg-shlink-mcp:dev"
 APP_CONTEXT = "app/bg-shlink-mcp"
 PROBE_TIMEOUT = 10
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
+
+def compose_build_args(env: dict[str, str]) -> list[str]:
+    """Mirror compose's `args: SHLINK_OPENAPI_VERSION:` passthrough — forward
+    the var only when set, so an unset value lets the Dockerfile ARG default
+    win instead of clobbering it with an empty string."""
+    flags: list[str] = []
+    spec_version = env.get("SHLINK_OPENAPI_VERSION", "").strip()
+    if spec_version:
+        flags.extend(["--build-arg", f"SHLINK_OPENAPI_VERSION={spec_version}"])
+    return flags
 
 
 def load_dotenv(env_path: Path) -> dict[str, str]:
@@ -296,27 +303,12 @@ def main() -> int:
         help="Host port for --http mode (default: 8000)",
     )
 
-    source = parser.add_mutually_exclusive_group()
-    source.add_argument(
-        "--published",
-        action="store_true",
-        help="Pull and run the released GHCR image instead of building from "
-        "your working tree. Useful for reproducing a bug against the actual "
-        "shipped artifact; not useful for active development.",
-    )
-    source.add_argument(
-        "--no-build",
-        action="store_true",
-        help="Skip the local build and reuse the cached local image. "
-        "Drop this flag whenever the source tree has changed.",
-    )
-
     parser.add_argument(
         "--image",
-        default=None,
-        help=f"Override the image tag (default: {DEFAULT_LOCAL_IMAGE}, "
-        f"or {PUBLISHED_IMAGE} with --published). With --image set, the "
-        "script still builds (default) or pulls (--published) into that tag.",
+        default=LOCAL_IMAGE,
+        help=f"Override the local image tag (default: {LOCAL_IMAGE}). "
+        "The script always builds this tag from app/bg-shlink-mcp — the "
+        "tag is local-only and never pushed.",
     )
     parser.add_argument(
         "--network",
@@ -330,10 +322,9 @@ def main() -> int:
 
     # ── remote mode: no docker, no .env ──
     if args.remote:
-        if args.published or args.no_build or args.image or args.network:
+        if args.image != LOCAL_IMAGE or args.network:
             print(
-                "warning: --published/--no-build/--image/--network are "
-                "ignored in --remote mode",
+                "warning: --image/--network are ignored in --remote mode",
                 file=sys.stderr,
             )
         return run_remote(args.remote)
@@ -345,29 +336,19 @@ def main() -> int:
     require_setting(env, "SHLINK_URL")
     require_setting(env, "SHLINK_API_KEY")
 
-    if args.published:
-        image = args.image or PUBLISHED_IMAGE
-        # `docker run` does not refresh a tag that is already cached, so a
-        # stale `:latest` from a previous session would silently win over the
-        # current registry contents. Force a refresh.
-        # check=False — if the registry is unreachable (offline, auth missing),
-        # fall through to whatever's cached rather than aborting the session.
-        print(f">>> docker pull {image}")
-        subprocess.run(["docker", "pull", image], check=False)
-    else:
-        image = args.image or DEFAULT_LOCAL_IMAGE
-        if not args.no_build:
-            os.chdir(project_root)
-            build_cmd = [
-                "docker", "build", "-t", image,
-                "--target", "production", APP_CONTEXT,
-            ]
-            print(f">>> {' '.join(build_cmd)}")
-            subprocess.run(build_cmd, check=True)
+    os.chdir(project_root)
+    build_cmd = [
+        "docker", "build", "-t", args.image,
+        "--target", "production",
+        *compose_build_args(env),
+        APP_CONTEXT,
+    ]
+    print(f">>> {' '.join(build_cmd)}")
+    subprocess.run(build_cmd, check=True)
 
     if args.http:
-        return run_http(image, env, args.port, args.network)
-    return run_stdio(image, env, args.network)
+        return run_http(args.image, env, args.port, args.network)
+    return run_stdio(args.image, env, args.network)
 
 
 if __name__ == "__main__":

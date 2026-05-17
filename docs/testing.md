@@ -107,9 +107,8 @@ manual Scenarios 1, 2 and 3 below describe.
 
 | Use case | Command |
 | --- | --- |
-| Local stdio (no auth, no Docker port) | `python scripts/dev-inspector.py` |
-| Local HTTP detached (no auth, Inspector GUI) | `python scripts/dev-inspector.py --http` |
-| Local stdio, rebuild image first | `python scripts/dev-inspector.py --build` |
+| Local stdio (builds image, no auth, no Docker port) | `python scripts/dev-inspector.py` |
+| Local HTTP detached (builds image, no auth, Inspector GUI) | `python scripts/dev-inspector.py --http` |
 | Remote OIDC (preflight + Inspector GUI) | `python scripts/dev-inspector.py --remote https://<host>/mcp` |
 | Join an existing compose network | `python scripts/dev-inspector.py --network bg-shlink-mcp` |
 
