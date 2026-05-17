@@ -51,6 +51,11 @@ ENV/
 .python-version
 .venv-test/
 
+# uv - lockfile not tracked: the Docker build uses `pip install` (not `uv sync`),
+# so a committed uv.lock would be a phantom artifact with no effect on deploys.
+# uv generates it locally on `uv run` / `uv sync` for dev convenience.
+uv.lock
+
 # IDE / Editor
 .idea/
 .vscode/
