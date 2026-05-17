@@ -63,6 +63,11 @@ plain `npx` when you need transport/host control they don't expose.
 - For remote tests against a Traefik/Coolify deployment: a valid IdP
   account that the configured `AUTH_MODE` accepts.
 
+> **Shortcut:** [`scripts/dev-inspector.py`](../scripts/dev-inspector.py)
+> wraps the most common workflows below into a single command — local
+> stdio, local HTTP, and remote OIDC with preflight probes. See
+> [Scenario 0](#scenario-0--one-command-script-the-shortest-path) below.
+
 ---
 
 ## Launching Inspector
@@ -90,6 +95,57 @@ Keep the terminal open — closing it kills the proxy.
 > **Note:** if port `6274` or `6277` is already in use (another Inspector
 > session, dev server, …), set `CLIENT_PORT` / `SERVER_PORT` env vars:
 > `CLIENT_PORT=6300 SERVER_PORT=6301 npx @modelcontextprotocol/inspector`.
+
+---
+
+## Scenario 0 · One-command script (the shortest path)
+
+[`scripts/dev-inspector.py`](../scripts/dev-inspector.py) wraps the three
+most common workflows so you don't have to type the long `npx` /
+`docker run` combinations by hand. It covers exactly the cases the
+manual Scenarios 1, 2 and 3 below describe.
+
+| Use case | Command |
+| --- | --- |
+| Local stdio (no auth, no Docker port) | `python scripts/dev-inspector.py` |
+| Local HTTP detached (no auth, Inspector GUI) | `python scripts/dev-inspector.py --http` |
+| Local stdio, rebuild image first | `python scripts/dev-inspector.py --build` |
+| Remote OIDC (preflight + Inspector GUI) | `python scripts/dev-inspector.py --remote https://<host>/mcp` |
+| Join an existing compose network | `python scripts/dev-inspector.py --network bg-shlink-mcp` |
+
+**What it does in each mode:**
+
+- **Local stdio (default):** validates your `.env` has `SHLINK_URL` +
+  `SHLINK_API_KEY`, forces `AUTH_MODE=none` / `ENVIRONMENT=development`,
+  then runs `npx @modelcontextprotocol/inspector docker run --rm -i …
+  serve --transport stdio`. Container lifecycle is bound to Inspector —
+  closing Inspector stops everything, `--rm` cleans up. No host port
+  exposed.
+- **Local HTTP (`--http`):** same env validation, but spawns the
+  container detached on `localhost:<PORT>` and launches Inspector GUI
+  for you to paste the URL. Lets you keep the container alive across
+  Inspector restarts; useful when iterating on Inspector queries
+  themselves.
+- **Remote (`--remote <URL>`):** skips Docker entirely. Runs four
+  preflight probes against the deployed instance —
+  `/healthz`, `/.well-known/oauth-protected-resource`,
+  `/.well-known/oauth-authorization-server`, and `POST /mcp` (expecting
+  `401`) — then launches Inspector GUI. The probes use only stdlib
+  `urllib`, so the script runs on a freshly-cloned repo without
+  `pip install`.
+
+**Why these probes matter for remote debugging.** When Inspector hangs
+at "Connecting…" against a remote endpoint, the cause is almost always
+one of: server is down, RFC 9728 metadata is misconfigured, IdP
+discovery URL is unreachable, or `/mcp` doesn't gate properly. The
+script surfaces all four in under a second, before Inspector ever
+opens a browser tab.
+
+**When to drop the script and use the manual commands below:** when you
+need to override env vars per-run (different Shlink instance, different
+log level), when you want a different image tag, or when you're
+debugging the script itself. The four scenarios below document every
+moving part explicitly.
 
 ---
 
@@ -404,7 +460,9 @@ docker compose -f docker-compose.development.yml logs shlink-mcp | grep openapi
 ```
 
 Common culprits: `SHLINK_URL` typo, Shlink container not on the same
-network, or the pinned spec URL (`SHLINK_OPENAPI_URL`) is unreachable.
+network, or — if you've overridden `SHLINK_OPENAPI_URL` to a remote source —
+that URL is unreachable. The default (`file:///app/openapi/shlink.json`) is
+baked into the image and shouldn't fail unless the image is broken.
 
 ### Inspector hangs at "Authenticating…" against a remote server
 
