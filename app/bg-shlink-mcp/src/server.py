@@ -8,8 +8,10 @@ Owns the lifespan (spec refresh task + client teardown).
 from __future__ import annotations
 
 import asyncio
+import string
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from pathlib import Path
 from typing import TYPE_CHECKING, AsyncIterator
 
 import structlog
@@ -106,7 +108,42 @@ async def build_app(settings: Settings | None = None) -> "FastMCP":
     )
 
     _register_healthz_route(mcp)
+    _register_index_route(mcp, settings)
     return mcp
+
+
+def _register_index_route(mcp: "FastMCP", settings: Settings) -> None:
+    """
+    Serve a human-readable status + quickstart page at /.
+
+    Rendered once at startup from src/static/index.html using string.Template
+    (so CSS braces don't collide with str.format placeholders). The fully
+    substituted HTML is cached in the closure - no per-request rendering.
+    """
+    from starlette.responses import HTMLResponse
+
+    template_path = Path(__file__).parent / "static" / "index.html"
+    try:
+        raw = template_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        logger.warning("index.template_missing", path=str(template_path))
+        return
+
+    base_url = str(settings.public_base_url).rstrip("/")
+    rendered = string.Template(raw).safe_substitute(
+        version=__version__,
+        protocol="MCP / Streamable HTTP",
+        environment=settings.environment.value,
+        auth_mode=settings.auth_mode.value,
+        mcp_url=f"{base_url}/mcp",
+    )
+
+    @mcp.custom_route("/", methods=["GET"], include_in_schema=False)
+    async def _index(_request) -> HTMLResponse:  # type: ignore[no-untyped-def]
+        return HTMLResponse(
+            rendered,
+            headers={"Cache-Control": "public, max-age=60"},
+        )
 
 
 def _register_healthz_route(mcp: "FastMCP") -> None:
