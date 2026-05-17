@@ -119,7 +119,7 @@ def list_tools(
     async def _render() -> str:
         settings = get_settings()
         mcp = await build_app(settings)
-        return render_catalogue_markdown(mcp)
+        return await render_catalogue_markdown(mcp)
 
     markdown = asyncio.run(_render())
     if output:

@@ -54,15 +54,18 @@ METHOD_ANNOTATIONS: dict[str, ToolAnnotations] = {
 # Order matters - first match wins. Anything not matched stays a Tool (default).
 
 SHLINK_ROUTE_MAPS: list[RouteMap] = [
-    # Health probe -> Resource (read-only, no side effects, surfaced as shlink://health)
-    RouteMap(pattern=r"^/rest/v\d+/health$", mcp_type=MCPType.RESOURCE),
+    # Health probe -> Resource (read-only, no side effects, surfaced as shlink://health).
+    # Pattern accepts both concrete (/rest/v3/health) and templated
+    # (/rest/v{version}/health) paths — Shlink ships the spec with the templated
+    # form, but a hand-pinned spec or test stub might use a concrete version.
+    RouteMap(pattern=r"^/rest/v(?:\d+|\{[^}]+\})/health$", mcp_type=MCPType.RESOURCE),
     RouteMap(pattern=r"^/health$", mcp_type=MCPType.RESOURCE),
 
     # Mercure / SSE event endpoints aren't useful to an LLM and confuse the schema.
-    RouteMap(pattern=r"^/rest/v\d+/mercure-info$", mcp_type=MCPType.EXCLUDE),
+    RouteMap(pattern=r"^/rest/v(?:\d+|\{[^}]+\})/mercure-info$", mcp_type=MCPType.EXCLUDE),
 
     # rules/* and tags/parse-csv are administrative subroutes we don't want exposed.
-    RouteMap(pattern=r"^/rest/v\d+/rules", mcp_type=MCPType.EXCLUDE),
+    RouteMap(pattern=r"^/rest/v(?:\d+|\{[^}]+\})/rules", mcp_type=MCPType.EXCLUDE),
 ]
 
 
@@ -122,24 +125,125 @@ DESCRIPTION_OVERRIDES: dict[str, str] = {
 
 
 def _normalize_path(path: str) -> str:
-    """Strip /rest/v3 prefix when present so overrides match either form."""
-    return re.sub(r"^/rest/v\d+", "", path) or "/"
+    """Strip the version prefix so (method, path) overrides match either form.
 
-
-def custom_names(route: Any, _existing: str) -> str | None:
+    Handles both concrete (`/rest/v3/foo`) and templated (`/rest/v{version}/foo`)
+    forms — Shlink ships the spec with the templated form, but a hand-pinned
+    spec or test stub might use a concrete version number.
     """
-    FastMCP from_openapi() name-mapper callback.
+    return re.sub(r"^/rest/v(?:\d+|\{[^}]+\})", "", path) or "/"
 
-    `route` exposes `method` and `path`. We normalise the path to drop the
-    version prefix, then look up the override. Returning None lets FastMCP
-    keep its default (operationId-based) name.
+
+def _build_mcp_names_map(spec: dict[str, Any]) -> dict[str, str]:
+    """Translate (method, path) overrides into the {operationId: name} form
+    FastMCP 3.x expects.
+
+    FastMCP 2.x took a callback `(route, existing) -> str | None`; 3.x takes
+    a plain dict keyed by operationId. We keep maintaining NAME_OVERRIDES in
+    the (method, path) form because that's what humans read in the Shlink
+    docs — this function bridges to FastMCP's preferred shape by walking the
+    spec once at startup.
     """
-    method = (getattr(route, "method", None) or "").upper()
-    raw_path = getattr(route, "path", None) or ""
-    override = NAME_OVERRIDES.get((method, _normalize_path(raw_path)))
-    if override:
-        return override
-    return None
+    overrides: dict[str, str] = {}
+    paths = spec.get("paths") or {}
+    if not isinstance(paths, dict):
+        return overrides
+    for raw_path, path_item in paths.items():
+        if not isinstance(path_item, dict):
+            continue
+        normalized = _normalize_path(raw_path)
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+            op_id = operation.get("operationId")
+            if not isinstance(op_id, str) or not op_id:
+                continue
+            mapped = NAME_OVERRIDES.get((method.upper(), normalized))
+            if mapped:
+                overrides[op_id] = mapped
+    return overrides
+
+
+class _BuildCounters:
+    """Mutable counters populated by the component callback during from_openapi().
+
+    FastMCP 3.x doesn't expose a sync way to count tools/resources after the
+    fact (the OpenAPIProvider stores nothing in `_components` for OpenAPI-
+    generated entries — it generates them on demand). The component callback
+    is the only point where we see every component eagerly, so we count there.
+    """
+
+    __slots__ = ("tools", "resources", "annotated", "description_overrides_applied")
+
+    def __init__(self) -> None:
+        self.tools = 0
+        self.resources = 0
+        self.annotated = 0
+        self.description_overrides_applied = 0
+
+
+def _make_component_fn(counters: _BuildCounters):
+    """Build a callback for OpenAPIProvider.mcp_component_fn.
+
+    Called once per generated component (Tool / Resource / ResourceTemplate)
+    during from_openapi(). We use it to:
+      1. Apply method-based MCP annotations (readOnly/destructive hints —
+         a real safety signal that MCP clients use to gate auto-run).
+      2. Apply our DESCRIPTION_OVERRIDES on top of Shlink's summaries.
+      3. Count what was generated so the bootstrap log is accurate.
+
+    Mutates the component in-place. Failures are logged at DEBUG but never
+    abort the build — a missing annotation just means the client falls back
+    to the safe default (treat as destructive).
+    """
+
+    def fn(route: Any, component: Any) -> None:
+        type_name = type(component).__name__
+
+        # Components are Tool / OpenAPITool / Resource / OpenAPIResource / Template etc.
+        # The "Tool" substring is the most reliable cross-version discriminator.
+        is_tool = "Tool" in type_name
+
+        if is_tool:
+            counters.tools += 1
+        else:
+            counters.resources += 1
+
+        component_name = getattr(component, "name", None)
+        if isinstance(component_name, str) and component_name in DESCRIPTION_OVERRIDES:
+            try:
+                component.description = DESCRIPTION_OVERRIDES[component_name]
+                counters.description_overrides_applied += 1
+            except (AttributeError, ValueError) as exc:
+                logger.debug(
+                    "tools.description_override_skipped",
+                    component=component_name,
+                    reason=str(exc),
+                )
+
+        if is_tool:
+            method = (getattr(route, "method", None) or "").upper()
+            annotations = METHOD_ANNOTATIONS.get(method)
+            if annotations is None:
+                logger.debug(
+                    "tools.annotation_skipped",
+                    component=component_name,
+                    reason="unknown_method",
+                    method=method,
+                )
+                return
+            try:
+                component.annotations = annotations
+                counters.annotated += 1
+            except (AttributeError, ValueError) as exc:
+                logger.debug(
+                    "tools.annotation_skipped",
+                    component=component_name,
+                    reason="frozen_model",
+                    error=str(exc),
+                )
+
+    return fn
 
 
 def build_mcp_from_spec(
@@ -157,13 +261,16 @@ def build_mcp_from_spec(
     Kept thin on purpose - real wiring (config -> client -> spec -> mcp) lives
     in server.py. This function is unit-testable with a stub spec + httpx client.
     """
+    counters = _BuildCounters()
+
     kwargs: dict[str, Any] = {
         "openapi_spec": spec,
         "client": http_client,
         "name": name,
         "instructions": instructions,
         "route_maps": SHLINK_ROUTE_MAPS,
-        "mcp_names": custom_names,
+        "mcp_names": _build_mcp_names_map(spec),
+        "mcp_component_fn": _make_component_fn(counters),
         "tags": {"shlink"},
     }
     if auth is not None:
@@ -172,111 +279,38 @@ def build_mcp_from_spec(
         kwargs["lifespan"] = lifespan
 
     mcp = FastMCP.from_openapi(**kwargs)
-    _apply_description_overrides(mcp)
-    annotated, skipped = _apply_tool_annotations(mcp)
     logger.info(
         "tools.generated",
-        tool_count=_count_registered_tools(mcp),
-        resource_count=_count_registered_resources(mcp),
-        tools_annotated=annotated,
-        tools_unannotated=skipped,
+        tool_count=counters.tools,
+        resource_count=counters.resources,
+        tools_annotated=counters.annotated,
+        description_overrides_applied=counters.description_overrides_applied,
     )
     return mcp
-
-
-def _apply_description_overrides(mcp: FastMCP) -> None:
-    """Walk the registered tools and apply our description overrides in place."""
-    registry = getattr(mcp, "_tool_manager", None) or getattr(mcp, "tool_manager", None)
-    if registry is None:
-        return
-    tools = getattr(registry, "_tools", None) or getattr(registry, "tools", None) or {}
-    for tool_name, tool in tools.items():
-        if tool_name in DESCRIPTION_OVERRIDES:
-            try:
-                tool.description = DESCRIPTION_OVERRIDES[tool_name]
-            except AttributeError:
-                # Newer FastMCP versions may use a frozen model - log and move on.
-                logger.debug("tools.description_override_skipped", tool=tool_name)
-
-
-def _apply_tool_annotations(mcp: FastMCP) -> tuple[int, int]:
-    """
-    Tag every OpenAPI-derived tool with method-appropriate annotations so MCP
-    clients know which calls are safe to auto-run vs. need human approval.
-
-    Returns (annotated_count, skipped_count). Skipped tools (missing _route
-    or frozen annotation slot) are logged at DEBUG; they fall back to MCP
-    defaults, which treat unknown tools as destructive — the safe default.
-    """
-    registry = getattr(mcp, "_tool_manager", None) or getattr(mcp, "tool_manager", None)
-    if registry is None:
-        return (0, 0)
-    tools = getattr(registry, "_tools", None) or getattr(registry, "tools", None) or {}
-
-    annotated = 0
-    skipped = 0
-    for tool_name, tool in tools.items():
-        route = getattr(tool, "_route", None)
-        method = (getattr(route, "method", None) or "").upper()
-        annotations = METHOD_ANNOTATIONS.get(method)
-        if annotations is None:
-            skipped += 1
-            logger.debug("tools.annotation_skipped", tool=tool_name, reason="unknown_method", method=method)
-            continue
-        try:
-            tool.annotations = annotations
-            annotated += 1
-        except (AttributeError, ValueError):
-            skipped += 1
-            logger.debug("tools.annotation_skipped", tool=tool_name, reason="frozen_model")
-    return (annotated, skipped)
-
-
-def _count_registered_tools(mcp: FastMCP) -> int:
-    return _count_registry(mcp, ("_tool_manager", "tool_manager"), ("_tools", "tools"))
-
-
-def _count_registered_resources(mcp: FastMCP) -> int:
-    return _count_registry(mcp, ("_resource_manager", "resource_manager"), ("_resources", "resources"))
-
-
-def _count_registry(mcp: FastMCP, manager_attrs: tuple[str, ...], dict_attrs: tuple[str, ...]) -> int:
-    manager = None
-    for attr in manager_attrs:
-        manager = getattr(mcp, attr, None)
-        if manager is not None:
-            break
-    if manager is None:
-        return 0
-    for attr in dict_attrs:
-        items = getattr(manager, attr, None)
-        if isinstance(items, dict):
-            return len(items)
-    return 0
 
 
 # ── Catalogue rendering (used by `bg-shlink-mcp tools` and CI doc generator) ─
 
 
-def render_catalogue_markdown(mcp: FastMCP) -> str:
-    """Render a Markdown catalogue of registered tools - powers docs/tools.md."""
-    registry = getattr(mcp, "_tool_manager", None) or getattr(mcp, "tool_manager", None)
-    tools = (
-        getattr(registry, "_tools", None) or getattr(registry, "tools", None) or {}
-        if registry
-        else {}
-    )
+async def render_catalogue_markdown(mcp: FastMCP) -> str:
+    """Render a Markdown catalogue of registered tools — powers docs/tools.md.
+
+    Async because FastMCP 3.x's `list_tools()` is async (it aggregates across
+    all registered providers, some of which may resolve tools lazily).
+    """
+    tools = await mcp.list_tools()
+    tools_by_name = {getattr(t, "name", str(i)): t for i, t in enumerate(tools)}
 
     lines: list[str] = [
         "# Shlink MCP - Tool Catalogue",
         "",
         "> Auto-generated from the live Shlink OpenAPI spec. Do not hand-edit.",
         "",
-        f"**Tool count:** {len(tools)}",
+        f"**Tool count:** {len(tools_by_name)}",
         "",
     ]
-    for tool_name in sorted(tools):
-        tool = tools[tool_name]
+    for tool_name in sorted(tools_by_name):
+        tool = tools_by_name[tool_name]
         description = getattr(tool, "description", "") or ""
         lines.append(f"## `{tool_name}`")
         lines.append("")
