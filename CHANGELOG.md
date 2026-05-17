@@ -1,3 +1,9 @@
+## [0.5.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.2...v0.5.3) (2026-05-17)
+
+### 🐛 Bug Fixes
+
+* **shlink:** stripped /rest/v{version} prefix from spec paths ([27857d6](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/27857d6860325ef86b0a2dfc3c464b9514a19d85))
+
 ## [0.5.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.1...v0.5.2) (2026-05-17)
 
 ### ♻️ Refactoring
