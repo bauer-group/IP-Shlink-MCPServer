@@ -1,0 +1,172 @@
+# =============================================================================
+# Shlink MCP Server - Production Stack (Traefik Reverse Proxy)
+# =============================================================================
+# Usage:  docker compose -f docker-compose.traefik.yml up -d
+#
+# Prerequisites:
+#   - Traefik v2/v3 reverse proxy running on the ${PROXY_NETWORK} network
+#   - DNS record: ${SHLINK_MCP_HOSTNAME} -> this host
+#   - A reachable Shlink instance (same Docker network or public URL)
+#   - An OIDC provider App Registration / OAuth client configured
+#
+# Architecture:
+#       AI Clients
+#            |  HTTPS (OAuth 2.1, /mcp)
+#            v
+#       +---------+
+#       | Traefik | - proxy network (external)
+#       +----+----+
+#            |
+#       +----v--------------+
+#       | shlink-mcp - redis| - local network (private)
+#       +-------------------+
+# =============================================================================
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
+
+services:
+  shlink-mcp:
+    image: ${SHLINK_MCP_IMAGE:-ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp}:${SHLINK_MCP_VERSION:-latest}
+    container_name: ${STACK_NAME:-bg-shlink-mcp}
+    hostname: ${STACK_NAME:-bg-shlink-mcp}
+    restart: unless-stopped
+    <<: *logging
+
+    environment:
+      TZ: ${TIME_ZONE:-Etc/UTC}
+
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-streamable-http}
+      MCP_HOST: ${MCP_HOST:-0.0.0.0}
+      MCP_PORT: ${MCP_PORT:-8000}
+
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      SHLINK_URL: ${SHLINK_URL:?SHLINK_URL is required}
+      SHLINK_API_KEY: ${SHLINK_API_KEY:?SHLINK_API_KEY is required}
+      SHLINK_OPENAPI_URL: ${SHLINK_OPENAPI_URL:-https://raw.githubusercontent.com/shlinkio/shlink/v5.0.1/docs/swagger/swagger.json}
+      SHLINK_OPENAPI_REFRESH_INTERVAL: ${SHLINK_OPENAPI_REFRESH_INTERVAL:-3600}
+      SHLINK_HTTP_TIMEOUT: ${SHLINK_HTTP_TIMEOUT:-30}
+
+      AUTH_MODE: ${AUTH_MODE:?AUTH_MODE is required (entra-single | entra-multi | google | oidc)}
+      AUTH_JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY:?AUTH_JWT_SIGNING_KEY is required}
+      AUTH_REDIS_URL: ${AUTH_REDIS_URL:-redis://redis:6379/0}
+      AUTH_STORAGE_ENCRYPTION_KEY: ${AUTH_STORAGE_ENCRYPTION_KEY:?AUTH_STORAGE_ENCRYPTION_KEY is required}
+
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      ENTRA_ALLOWED_TENANTS: ${ENTRA_ALLOWED_TENANTS:-}
+      ENTRA_EXTRA_SCOPES: ${ENTRA_EXTRA_SCOPES:-}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_ALLOWED_DOMAINS: ${GOOGLE_ALLOWED_DOMAINS:-}
+
+      OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUTH_URI: ${OIDC_AUTH_URI:-}
+      OIDC_TOKEN_URI: ${OIDC_TOKEN_URI:-}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-}
+      OIDC_USERINFO_URI: ${OIDC_USERINFO_URI:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
+
+      RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED:-true}
+      RATE_LIMITER_REQUESTS: ${RATE_LIMITER_REQUESTS:-600}
+      RATE_LIMITER_WINDOW_SECONDS: ${RATE_LIMITER_WINDOW_SECONDS:-60}
+
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    networks:
+      - proxy
+      - local
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK:-EDGEPROXY}"
+
+      # HTTP -> HTTPS redirect
+      - "traefik.http.middlewares.${STACK_NAME:-bg-shlink-mcp}-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.${STACK_NAME:-bg-shlink-mcp}-redirect.redirectscheme.permanent=true"
+
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-http.rule=Host(`${SHLINK_MCP_HOSTNAME}`)"
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-http.entrypoints=web"
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-http.middlewares=${STACK_NAME:-bg-shlink-mcp}-redirect"
+
+      # HTTPS
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-app.rule=Host(`${SHLINK_MCP_HOSTNAME}`)"
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-app.entrypoints=web-secure"
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-app.tls=true"
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-app.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${STACK_NAME:-bg-shlink-mcp}-app.service=${STACK_NAME:-bg-shlink-mcp}-app"
+      - "traefik.http.services.${STACK_NAME:-bg-shlink-mcp}-app.loadBalancer.server.port=8000"
+
+
+  # Memory profile: OAuth client registrations + token sessions are tiny (a few KB
+  # each, hundreds at most). --maxmemory caps the process; --maxmemory-policy
+  # noeviction makes Redis refuse new writes when full instead of silently
+  # dropping OAuth state — fail loudly so operators can investigate.
+  redis:
+    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-8-alpine}
+    container_name: ${STACK_NAME:-bg-shlink-mcp}-redis
+    restart: unless-stopped
+    <<: *logging
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    mem_limit: ${REDIS_CONTAINER_MEM_LIMIT:-384m}
+    mem_reservation: 64m
+    volumes:
+      - redis-data:/data
+    networks:
+      - local
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+volumes:
+  redis-data:
+    driver: local
+    name: ${STACK_NAME:-bg-shlink-mcp}-redis
+
+
+networks:
+  local:
+    driver: bridge
+    name: ${STACK_NAME:-bg-shlink-mcp}
+    enable_ipv6: true
+
+  proxy:
+    name: ${PROXY_NETWORK:-EDGEPROXY}
+    external: true

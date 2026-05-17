@@ -1,0 +1,143 @@
+# =============================================================================
+# Shlink MCP Server - Coolify Deployment
+# =============================================================================
+# Coolify auto-generates Traefik routers from `coolify.managed=true` labels
+# and reads the exposed container port. No host ports, no proxy network -
+# the Coolify dashboard owns ingress + TLS.
+#
+# Configure ALL secrets in the Coolify "Environment Variables" pane.
+# =============================================================================
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
+
+services:
+  shlink-mcp:
+    image: ${SHLINK_MCP_IMAGE:-ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp}:${SHLINK_MCP_VERSION:-latest}
+    container_name: ${STACK_NAME:-bg-shlink-mcp}
+    restart: unless-stopped
+    <<: *logging
+
+    environment:
+      TZ: ${TIME_ZONE:-Etc/UTC}
+
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-streamable-http}
+      MCP_HOST: ${MCP_HOST:-0.0.0.0}
+      MCP_PORT: ${MCP_PORT:-8000}
+
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      SHLINK_URL: ${SHLINK_URL:?SHLINK_URL is required}
+      SHLINK_API_KEY: ${SHLINK_API_KEY:?SHLINK_API_KEY is required}
+      SHLINK_OPENAPI_URL: ${SHLINK_OPENAPI_URL:-https://raw.githubusercontent.com/shlinkio/shlink/v5.0.1/docs/swagger/swagger.json}
+      SHLINK_OPENAPI_REFRESH_INTERVAL: ${SHLINK_OPENAPI_REFRESH_INTERVAL:-3600}
+      SHLINK_HTTP_TIMEOUT: ${SHLINK_HTTP_TIMEOUT:-30}
+
+      AUTH_MODE: ${AUTH_MODE:?AUTH_MODE is required}
+      AUTH_JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY:?AUTH_JWT_SIGNING_KEY is required}
+      AUTH_REDIS_URL: ${AUTH_REDIS_URL:-redis://redis:6379/0}
+      AUTH_STORAGE_ENCRYPTION_KEY: ${AUTH_STORAGE_ENCRYPTION_KEY:?AUTH_STORAGE_ENCRYPTION_KEY is required}
+
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      ENTRA_ALLOWED_TENANTS: ${ENTRA_ALLOWED_TENANTS:-}
+      ENTRA_EXTRA_SCOPES: ${ENTRA_EXTRA_SCOPES:-}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_ALLOWED_DOMAINS: ${GOOGLE_ALLOWED_DOMAINS:-}
+
+      OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUTH_URI: ${OIDC_AUTH_URI:-}
+      OIDC_TOKEN_URI: ${OIDC_TOKEN_URI:-}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-}
+      OIDC_USERINFO_URI: ${OIDC_USERINFO_URI:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
+
+      RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED:-true}
+      RATE_LIMITER_REQUESTS: ${RATE_LIMITER_REQUESTS:-600}
+      RATE_LIMITER_WINDOW_SECONDS: ${RATE_LIMITER_WINDOW_SECONDS:-60}
+
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}
+
+    expose:
+      - "8000"
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    networks:
+      - local
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    labels:
+      - "coolify.managed=true"
+      - "coolify.type=application"
+      - "coolify.name=${STACK_NAME:-bg-shlink-mcp}"
+
+
+  # Memory profile: OAuth client registrations + token sessions are tiny (a few KB
+  # each, hundreds at most). --maxmemory caps the process; --maxmemory-policy
+  # noeviction makes Redis refuse new writes when full instead of silently
+  # dropping OAuth state — fail loudly so operators can investigate.
+  redis:
+    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-8-alpine}
+    container_name: ${STACK_NAME:-bg-shlink-mcp}-redis
+    restart: unless-stopped
+    <<: *logging
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - noeviction
+    mem_limit: ${REDIS_CONTAINER_MEM_LIMIT:-384m}
+    mem_reservation: 64m
+    volumes:
+      - redis-data:/data
+    networks:
+      - local
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "coolify.managed=true"
+      - "coolify.type=service"
+
+
+volumes:
+  redis-data:
+    driver: local
+    name: ${STACK_NAME:-bg-shlink-mcp}-redis
+
+
+networks:
+  local:
+    driver: bridge
+    name: ${STACK_NAME:-bg-shlink-mcp}
+    enable_ipv6: true
