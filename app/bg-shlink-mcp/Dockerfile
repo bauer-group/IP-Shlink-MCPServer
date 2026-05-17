@@ -6,12 +6,32 @@
 #
 # Multi-stage build with integrated testing.
 #
-#   docker build --target prod -t bg-shlink-mcp .         # production only
+#   docker build --target production -t bg-shlink-mcp .   # production only
 #   docker build --target test -t bg-shlink-mcp-test .    # run tests
-#   docker build -t bg-shlink-mcp .                       # full pipeline (test gates prod)
+#   docker build -t bg-shlink-mcp .                       # full pipeline (test gates production)
+#
+# Pin a different Shlink spec version (defaults to the value below):
+#   docker build --build-arg SHLINK_OPENAPI_VERSION=v5.1.0 -t bg-shlink-mcp .
 # =============================================================================
 
-# ── Stage 1: Builder — install Python dependencies into a relocatable prefix ──
+# ── Stage 1a: Spec — fetch Shlink OpenAPI spec at BUILD time ─────────────────
+# The spec is a pinned, immutable git-tag URL. Baking it into the image means
+# the container needs no network access to GitHub at startup, and reproducible
+# builds yield reproducible tool surfaces. Override per-build via --build-arg.
+FROM alpine:3 AS spec
+
+ARG SHLINK_OPENAPI_VERSION=v5.0.1
+
+RUN apk add --no-cache curl ca-certificates \
+ && mkdir -p /spec \
+ && curl -fsSL --retry 3 --retry-delay 2 \
+      "https://raw.githubusercontent.com/shlinkio/shlink/${SHLINK_OPENAPI_VERSION}/docs/swagger/swagger.json" \
+      -o /spec/shlink.json \
+ && head -c 1 /spec/shlink.json | grep -q '{' \
+        || (echo "ERROR: fetched OpenAPI spec is not a JSON object" && cat /spec/shlink.json | head -c 200 && exit 1)
+
+
+# ── Stage 1b: Builder — install Python dependencies into a relocatable prefix ──
 FROM python:3.14-alpine AS builder
 
 RUN apk add --no-cache build-base libffi-dev
@@ -21,7 +41,7 @@ WORKDIR /build
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-# Install into /install so the prod stage can copy a clean, isolated tree.
+# Install into /install so the production stage can copy a clean, isolated tree.
 # `--no-deps` is intentionally NOT used - we want transitive deps included.
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --prefix=/install .
@@ -54,7 +74,7 @@ RUN env -i HOME="$HOME" PATH="$PATH" PYTHONPATH="$PYTHONPATH" \
 
 
 # ── Stage 3: Production — minimal runtime image ──────────────────────────────
-FROM python:3.14-alpine AS prod
+FROM python:3.14-alpine AS production
 
 # ── OCI / BAUER GROUP labels ────────────────────────────────────────────────
 LABEL vendor="BAUER GROUP"
@@ -85,13 +105,19 @@ RUN apk add --no-cache \
 COPY --from=builder /install /usr/local
 
 # Hard test-stage gate — if tests fail upstream, this COPY cannot resolve and
-# the prod build fails. The file path is arbitrary; we use README.md because
-# it's guaranteed to exist in the test stage.
+# the production build fails. The file path is arbitrary; we use README.md
+# because it's guaranteed to exist in the test stage.
 COPY --from=test /app/README.md /tmp/_test_passed
 RUN rm /tmp/_test_passed
 
 WORKDIR /app
 COPY --chown=mcp:mcp src/ ./src/
+
+# Baked-in OpenAPI spec from the build-time fetch stage. config.py defaults
+# point at file:///app/openapi/shlink.json so the container starts without
+# any outbound network call. Override SHLINK_OPENAPI_URL at runtime to track
+# a live source instead.
+COPY --from=spec --chown=mcp:mcp /spec/shlink.json /app/openapi/shlink.json
 
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \

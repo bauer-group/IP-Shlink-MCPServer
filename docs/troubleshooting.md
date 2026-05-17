@@ -118,15 +118,37 @@ If recurring, tighten the tool description in
 openapi.refresh_failed source=... error=...
 ```
 
-Shlink's spec endpoint is temporarily unreachable. The cached spec stays in
-place — tools keep working. If failures persist, switch to a pinned local
-spec:
+You only see this if you've opted into runtime refresh (`SHLINK_OPENAPI_REFRESH_INTERVAL > 0`)
+AND set `SHLINK_OPENAPI_URL` to a remote source. The cached spec stays in
+place — tools keep working until the next successful fetch.
 
-```ini
-SHLINK_OPENAPI_URL=file:///app/openapi/shlink-v5.0.1.json
-```
+The default deployment doesn't refresh at all: the spec is baked into the
+image at build time (`file:///app/openapi/shlink.json`), so there is no
+remote endpoint to be flaky. If you've turned on refresh and the warnings
+keep coming, switch back to the baked-in default (unset both env vars) or
+point at a stable in-house mirror.
 
-…and mount the file via a volume.
+### Wrong tool surface after a Shlink upgrade
+
+The baked-in spec is pinned at image-build time. If your Shlink instance
+runs a newer version than the image was built against, new endpoints won't
+appear as MCP tools and removed endpoints will still be listed.
+
+Two fixes, pick the one that matches your update cadence:
+
+1. **Rebuild the image with the matching version** (recommended for pinned
+   stacks):
+
+   ```bash
+   docker build --build-arg SHLINK_OPENAPI_VERSION=v5.1.0 -t bg-shlink-mcp .
+   ```
+
+2. **Track upstream at runtime** (no rebuild needed):
+
+   ```ini
+   SHLINK_OPENAPI_URL=https://raw.githubusercontent.com/shlinkio/shlink/v5.1.0/docs/swagger/swagger.json
+   SHLINK_OPENAPI_REFRESH_INTERVAL=3600
+   ```
 
 ---
 

@@ -52,8 +52,8 @@ services:
 
       SHLINK_URL: ${SHLINK_URL:?SHLINK_URL is required}
       SHLINK_API_KEY: ${SHLINK_API_KEY:?SHLINK_API_KEY is required}
-      SHLINK_OPENAPI_URL: ${SHLINK_OPENAPI_URL:-https://raw.githubusercontent.com/shlinkio/shlink/v5.0.1/docs/swagger/swagger.json}
-      SHLINK_OPENAPI_REFRESH_INTERVAL: ${SHLINK_OPENAPI_REFRESH_INTERVAL:-3600}
+      SHLINK_OPENAPI_URL: ${SHLINK_OPENAPI_URL:-file:///app/openapi/shlink.json}
+      SHLINK_OPENAPI_REFRESH_INTERVAL: ${SHLINK_OPENAPI_REFRESH_INTERVAL:-0}
       SHLINK_HTTP_TIMEOUT: ${SHLINK_HTTP_TIMEOUT:-30}
 
       AUTH_MODE: ${AUTH_MODE:?AUTH_MODE is required (entra-single | entra-multi | google | oidc)}

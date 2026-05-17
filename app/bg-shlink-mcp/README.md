@@ -36,9 +36,9 @@ exposed to callers.
 ## Build
 
 ```bash
-docker build --target prod -t bg-shlink-mcp .       # production only
+docker build --target production -t bg-shlink-mcp . # production only
 docker build --target test -t bg-shlink-mcp-test .  # run tests
-docker build -t bg-shlink-mcp .                     # full pipeline (test gates prod)
+docker build -t bg-shlink-mcp .                     # full pipeline (test gates production)
 ```
 
 ## Test

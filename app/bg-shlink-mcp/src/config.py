@@ -76,13 +76,22 @@ class Settings(BaseSettings):
         description="Shlink API key - has full read/write authority over Shlink",
     )
     shlink_openapi_url: str = Field(
-        default="https://raw.githubusercontent.com/shlinkio/shlink/v5.0.1/docs/swagger/swagger.json",
-        description="OpenAPI spec source: https://... or file://...",
+        default="file:///app/openapi/shlink.json",
+        description=(
+            "OpenAPI spec source: file://... or https://...  "
+            "The default points at the spec baked into the image at build time "
+            "(pinned via the SHLINK_OPENAPI_VERSION build-arg). Override to "
+            "track a live source - e.g. a custom Shlink fork or a different version."
+        ),
     )
     shlink_openapi_refresh_interval: int = Field(
-        default=3600,
+        default=0,
         ge=0,
-        description="How often (s) to refresh the spec at runtime; 0 = never",
+        description=(
+            "How often (s) to refresh the spec at runtime; 0 = never. "
+            "Stay at 0 for the baked-in default - the file is immutable. "
+            "Only set > 0 when SHLINK_OPENAPI_URL points at a mutable remote source."
+        ),
     )
     shlink_http_timeout: int = Field(
         default=30,

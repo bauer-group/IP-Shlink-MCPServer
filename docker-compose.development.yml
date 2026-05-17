@@ -20,7 +20,14 @@ services:
   shlink-mcp:
     build:
       context: ./app/bg-shlink-mcp
-      target: prod
+      target: production
+      args:
+        # Build-time pin for the OpenAPI spec baked into the image.
+        # Pass-through from the host env (or .env): if SHLINK_OPENAPI_VERSION
+        # is unset, this arg is NOT forwarded and the Dockerfile ARG default
+        # (v5.0.1) wins. Setting it to an empty string would clobber that
+        # default with "" - which is why we deliberately do not use `:-`.
+        SHLINK_OPENAPI_VERSION:
     image: ${SHLINK_MCP_IMAGE:-ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp}:${SHLINK_MCP_VERSION:-latest}
     container_name: ${STACK_NAME:-bg-shlink-mcp}
     hostname: ${STACK_NAME:-bg-shlink-mcp}
@@ -42,8 +49,8 @@ services:
 
       SHLINK_URL: ${SHLINK_URL:?SHLINK_URL is required}
       SHLINK_API_KEY: ${SHLINK_API_KEY:?SHLINK_API_KEY is required}
-      SHLINK_OPENAPI_URL: ${SHLINK_OPENAPI_URL:-https://raw.githubusercontent.com/shlinkio/shlink/v5.0.1/docs/swagger/swagger.json}
-      SHLINK_OPENAPI_REFRESH_INTERVAL: ${SHLINK_OPENAPI_REFRESH_INTERVAL:-3600}
+      SHLINK_OPENAPI_URL: ${SHLINK_OPENAPI_URL:-file:///app/openapi/shlink.json}
+      SHLINK_OPENAPI_REFRESH_INTERVAL: ${SHLINK_OPENAPI_REFRESH_INTERVAL:-0}
       SHLINK_HTTP_TIMEOUT: ${SHLINK_HTTP_TIMEOUT:-30}
 
       AUTH_MODE: ${AUTH_MODE:-none}
