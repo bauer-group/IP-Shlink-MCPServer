@@ -1,3 +1,17 @@
+## [0.5.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.4.0...v0.5.0) (2026-05-17)
+
+### 🚀 Features
+
+* **spec:** bundled Shlink modular OpenAPI spec at build + runtime ([a2b4e3e](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/a2b4e3e730cc5960431da0e9632fcc85bdbe82b2))
+
+### 🐛 Bug Fixes
+
+* **scripts:** resolved npx executable on Windows in dev-inspector ([6506364](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/6506364b62069e1eb8d22591c4d22ff5bad8abe3))
+
+### ♻️ Refactoring
+
+* **mcp:** adapted tool mapper to FastMCP 3.x APIs ([e27c5d5](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/e27c5d5a102e7dc13fecb3619b05de0bd4220b3c))
+
 ## [0.4.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.3.0...v0.4.0) (2026-05-17)
 
 ### 🚀 Features
