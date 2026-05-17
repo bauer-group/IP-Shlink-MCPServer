@@ -70,6 +70,12 @@ def require_command(name: str) -> None:
         sys.exit(f"error: '{name}' is not on PATH — install it first")
 
 
+def npx_cmd() -> str:
+    """Resolved npx path — Windows ships npx as npx.cmd, and subprocess
+    on Windows bypasses PATHEXT, so the bare name fails with WinError 2."""
+    return shutil.which("npx") or "npx"
+
+
 def env_flags(env: dict[str, str]) -> list[str]:
     """Forward only the keys the server actually reads — never the whole .env."""
     pass_through = [
@@ -101,7 +107,7 @@ def env_flags(env: dict[str, str]) -> list[str]:
 
 def run_stdio(image: str, env: dict[str, str], network: str | None) -> int:
     cmd = [
-        "npx", "-y", "@modelcontextprotocol/inspector",
+        npx_cmd(), "-y", "@modelcontextprotocol/inspector",
         "docker", "run", "--rm", "-i",
         *(["--network", network] if network else []),
         *env_flags(env),
@@ -147,7 +153,7 @@ def run_http(
     print(f"    Tail logs: docker logs -f {container}")
     print(f"    Stop:      docker stop {container}\n")
 
-    return subprocess.call(["npx", "-y", "@modelcontextprotocol/inspector"])
+    return subprocess.call([npx_cmd(), "-y", "@modelcontextprotocol/inspector"])
 
 
 # ── remote: preflight + Inspector ────────────────────────────────────────────
@@ -250,7 +256,7 @@ def run_remote(mcp_url: str) -> int:
     print(">>> launching Inspector (remote OIDC mode)")
     print(f"    Paste this URL into the GUI:  {mcp_url}")
     print("    Inspector will discover the IdP and open a browser tab for OAuth.\n")
-    return subprocess.call(["npx", "-y", "@modelcontextprotocol/inspector"])
+    return subprocess.call([npx_cmd(), "-y", "@modelcontextprotocol/inspector"])
 
 
 # ── entrypoint ───────────────────────────────────────────────────────────────
@@ -326,10 +332,28 @@ def main() -> int:
         build_cmd = ["docker", "build", "-t", image, "--target", "production", APP_CONTEXT]
         print(f">>> {' '.join(build_cmd)}")
         subprocess.run(build_cmd, check=True)
+    elif _is_remote_tag(image):
+        # `docker run` does NOT auto-pull a tag we already have cached locally,
+        # so a stale `:latest` from a previous session would silently win over
+        # the actual current build on the registry. Force a refresh.
+        # check=False — if the registry is unreachable (offline, auth missing),
+        # fall through to whatever's cached rather than aborting the session.
+        print(f">>> docker pull {image}")
+        subprocess.run(["docker", "pull", image], check=False)
 
     if args.http:
         return run_http(image, env, args.port, args.network)
     return run_stdio(image, env, args.network)
+
+
+def _is_remote_tag(image: str) -> bool:
+    """True if `image` looks like a registry-qualified reference.
+
+    Heuristic: presence of a slash before the tag separator. `ghcr.io/foo/bar`
+    and `quay.io/x/y:tag` are remote; `bg-shlink-mcp:dev` is local-only.
+    """
+    name = image.split(":", 1)[0]
+    return "/" in name
 
 
 if __name__ == "__main__":
