@@ -1,3 +1,9 @@
+## [0.5.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.1...v0.5.2) (2026-05-17)
+
+### ♻️ Refactoring
+
+* **scripts:** collapsed dev-inspector to a single build-run flow ([5d6e932](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/5d6e932f85fd87fba21a42b21c1e9d30fe3dae54))
+
 ## [0.5.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.0...v0.5.1) (2026-05-17)
 
 ### ♻️ Refactoring
