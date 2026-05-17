@@ -21,7 +21,7 @@ from typing import Any
 import httpx
 import structlog
 from fastmcp import FastMCP
-from fastmcp.server.openapi import MCPType, RouteMap
+from fastmcp.server.providers.openapi import MCPType, RouteMap
 
 logger = structlog.stdlib.get_logger("bg-shlink-mcp.tool_mapper")
 

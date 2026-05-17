@@ -27,8 +27,10 @@ classifiers = [
 ]
 dependencies = [
     # MCP framework — auto-generates the tool surface from OpenAPI and ships
-    # the Entra / Google / OAuthProxy providers we depend on.
-    "fastmcp>=2.13.0,<4.0.0",
+    # the Entra / Google / OAuthProxy providers we depend on. 3.x replaced
+    # authlib.jose with joserfc and moved the OpenAPI provider to
+    # fastmcp.server.providers.openapi (handled in shlink/tool_mapper.py).
+    "fastmcp>=3.0.0,<4.0.0",
 
     # Async HTTP — used by FastMCP internally and by our Shlink client wrapper.
     "httpx>=0.28.1,<1.0.0",
@@ -96,10 +98,6 @@ addopts = [
 filterwarnings = [
     "ignore::DeprecationWarning:pydantic._internal.*",
     "ignore::DeprecationWarning:starlette.*",
-    # FastMCP 2.x still imports authlib.jose; authlib migration to joserfc is
-    # tracked upstream. We don't use authlib directly, so any AuthlibDeprecation
-    # is transitive noise from FastMCP.
-    "ignore::authlib.deprecate.AuthlibDeprecationWarning",
 ]
 markers = [
     "integration: marks tests that hit external services (deselect with '-m \"not integration\"')",
