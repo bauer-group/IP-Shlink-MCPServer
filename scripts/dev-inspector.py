@@ -8,13 +8,19 @@ Three modes under one script:
   --http <PORT>          : local container detached on host port, Inspector GUI
   --remote <URL>         : preflight-probe deployed instance, then Inspector GUI
 
+Local modes build the image from your working tree on every run so the server
+under test reflects your current code — that's the whole point of local dev.
+Use --published to test the released GHCR build instead, or --no-build to
+reuse the last local build when you know nothing changed.
+
 The local modes need a populated .env (SHLINK_URL + SHLINK_API_KEY).
 The remote mode needs only the URL — the deployed server owns its own config.
 
 Examples:
   python scripts/dev-inspector.py
-  python scripts/dev-inspector.py --build
   python scripts/dev-inspector.py --http --port 8000
+  python scripts/dev-inspector.py --no-build               # reuse cached build
+  python scripts/dev-inspector.py --published              # test GHCR :latest
   python scripts/dev-inspector.py --network bg-shlink-mcp
   python scripts/dev-inspector.py --remote https://shlink-mcp.example.com/mcp
 """
@@ -32,8 +38,8 @@ import urllib.request
 from pathlib import Path
 
 
-DEFAULT_IMAGE = "ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp:latest"
 DEFAULT_LOCAL_IMAGE = "bg-shlink-mcp:dev"
+PUBLISHED_IMAGE = "ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp:latest"
 APP_CONTEXT = "app/bg-shlink-mcp"
 PROBE_TIMEOUT = 10
 
@@ -289,16 +295,28 @@ def main() -> int:
         default=8000,
         help="Host port for --http mode (default: 8000)",
     )
-    parser.add_argument(
-        "--build",
+
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--published",
         action="store_true",
-        help="Rebuild the image before starting (local modes only)",
+        help="Pull and run the released GHCR image instead of building from "
+        "your working tree. Useful for reproducing a bug against the actual "
+        "shipped artifact; not useful for active development.",
     )
+    source.add_argument(
+        "--no-build",
+        action="store_true",
+        help="Skip the local build and reuse the cached local image. "
+        "Drop this flag whenever the source tree has changed.",
+    )
+
     parser.add_argument(
         "--image",
         default=None,
-        help=f"Override image reference (default: {DEFAULT_IMAGE}, "
-        f"or {DEFAULT_LOCAL_IMAGE} with --build)",
+        help=f"Override the image tag (default: {DEFAULT_LOCAL_IMAGE}, "
+        f"or {PUBLISHED_IMAGE} with --published). With --image set, the "
+        "script still builds (default) or pulls (--published) into that tag.",
     )
     parser.add_argument(
         "--network",
@@ -312,9 +330,10 @@ def main() -> int:
 
     # ── remote mode: no docker, no .env ──
     if args.remote:
-        if args.build or args.image or args.network:
+        if args.published or args.no_build or args.image or args.network:
             print(
-                "warning: --build/--image/--network are ignored in --remote mode",
+                "warning: --published/--no-build/--image/--network are "
+                "ignored in --remote mode",
                 file=sys.stderr,
             )
         return run_remote(args.remote)
@@ -326,34 +345,29 @@ def main() -> int:
     require_setting(env, "SHLINK_URL")
     require_setting(env, "SHLINK_API_KEY")
 
-    image = args.image or (DEFAULT_LOCAL_IMAGE if args.build else DEFAULT_IMAGE)
-    if args.build:
-        os.chdir(project_root)
-        build_cmd = ["docker", "build", "-t", image, "--target", "production", APP_CONTEXT]
-        print(f">>> {' '.join(build_cmd)}")
-        subprocess.run(build_cmd, check=True)
-    elif _is_remote_tag(image):
-        # `docker run` does NOT auto-pull a tag we already have cached locally,
-        # so a stale `:latest` from a previous session would silently win over
-        # the actual current build on the registry. Force a refresh.
+    if args.published:
+        image = args.image or PUBLISHED_IMAGE
+        # `docker run` does not refresh a tag that is already cached, so a
+        # stale `:latest` from a previous session would silently win over the
+        # current registry contents. Force a refresh.
         # check=False — if the registry is unreachable (offline, auth missing),
         # fall through to whatever's cached rather than aborting the session.
         print(f">>> docker pull {image}")
         subprocess.run(["docker", "pull", image], check=False)
+    else:
+        image = args.image or DEFAULT_LOCAL_IMAGE
+        if not args.no_build:
+            os.chdir(project_root)
+            build_cmd = [
+                "docker", "build", "-t", image,
+                "--target", "production", APP_CONTEXT,
+            ]
+            print(f">>> {' '.join(build_cmd)}")
+            subprocess.run(build_cmd, check=True)
 
     if args.http:
         return run_http(image, env, args.port, args.network)
     return run_stdio(image, env, args.network)
-
-
-def _is_remote_tag(image: str) -> bool:
-    """True if `image` looks like a registry-qualified reference.
-
-    Heuristic: presence of a slash before the tag separator. `ghcr.io/foo/bar`
-    and `quay.io/x/y:tag` are remote; `bg-shlink-mcp:dev` is local-only.
-    """
-    name = image.split(":", 1)[0]
-    return "/" in name
 
 
 if __name__ == "__main__":
