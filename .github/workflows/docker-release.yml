@@ -1,0 +1,125 @@
+name: 🚀 Release & Docker Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'docker-compose*.yml'
+      - '.dockerignore'
+      - '.env.example'
+  workflow_dispatch:
+    inputs:
+      force-release:
+        description: 'force create release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  packages: write
+  security-events: write
+
+jobs:
+  # ============================================
+  # Validation Jobs
+  # ============================================
+
+  validate-compose:
+    name: 🔍 Validate Docker Compose
+    uses: bauer-group/automation-templates/.github/workflows/modules-validate-compose.yml@main
+    with:
+      compose-files: '["docker-compose.coolify.yml", "docker-compose.traefik.yml", "docker-compose.development.yml"]'
+      env-file: '.env.example'
+      validate-services: '["shlink-mcp", "redis"]'
+
+  validate-scripts:
+    name: 🔍 Validate Shell Scripts
+    uses: bauer-group/automation-templates/.github/workflows/modules-validate-shellscript.yml@main
+    with:
+      scan-directory: '.'
+      severity: 'error'
+
+  # ============================================
+  # Release Job (only on main branch push)
+  # ============================================
+
+  release:
+    name: 📦 Create Semantic Release
+    needs: [validate-compose, validate-scripts]
+    if: |
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.validate-compose.result == 'success' &&
+      needs.validate-scripts.result == 'success'
+    uses: bauer-group/automation-templates/.github/workflows/modules-semantic-release.yml@main
+    with:
+      target-branch: 'main'
+      dry-run: false
+      force-release: ${{ inputs.force-release || false }}
+      extra-plugins: '@google/semantic-release-replace-plugin'
+    secrets: inherit
+
+  # ============================================
+  # Docker Build & Push (bg-shlink-mcp image)
+  # ============================================
+
+  docker-build-bg-shlink-mcp-release:
+    name: 🐳 Build & Push bg-shlink-mcp
+    needs: release
+    if: needs.release.outputs.release-created == 'true'
+    uses: bauer-group/automation-templates/.github/workflows/docker-build.yml@main
+    with:
+      deploy-environment: 'production'
+      publish-to: 'ghcr'
+      ghcr-image-name: 'bauer-group/IP-Shlink-MCPServer/bg-shlink-mcp'
+      docker-image-name: 'bauergroup/bg-shlink-mcp'
+
+      release-version: ${{ needs.release.outputs.version }}
+      image-tags: 'stable'
+
+      update-dockerfile-version: true
+      auto-tags: true
+      latest-tag: true
+
+      dockerfile-path: './app/bg-shlink-mcp/Dockerfile'
+      docker-context: './app/bg-shlink-mcp'
+      platforms: 'linux/amd64,linux/arm64'
+
+      push: true
+
+      security-scan: false
+      security-fail-on: 'CRITICAL'
+      generate-sbom: true
+      sync-dockerhub-readme: true
+    secrets: inherit
+
+  docker-build-bg-shlink-mcp-pr:
+    name: 🔨 Validate bg-shlink-mcp Build (PR)
+    needs: [validate-compose, validate-scripts]
+    if: |
+      github.event_name == 'pull_request' &&
+      needs.validate-compose.result == 'success' &&
+      needs.validate-scripts.result == 'success'
+    uses: bauer-group/automation-templates/.github/workflows/docker-build.yml@main
+    with:
+      publish-to: 'ghcr'
+      ghcr-image-name: 'bauer-group/IP-Shlink-MCPServer/bg-shlink-mcp'
+
+      auto-tags: true
+      dockerfile-path: './app/bg-shlink-mcp/Dockerfile'
+      docker-context: './app/bg-shlink-mcp'
+      platforms: 'linux/amd64,linux/arm64'
+
+      push: false
+
+      security-scan: false
+      security-fail-on: 'CRITICAL'
+    secrets: inherit

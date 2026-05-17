@@ -1,0 +1,45 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md"
+      }
+    ],
+    [
+      "@google/semantic-release-replace-plugin",
+      {
+        "replacements": [
+          {
+            "files": ["app/bg-shlink-mcp/pyproject.toml"],
+            "from": "^version = \".*\"",
+            "to": "version = \"${nextRelease.version}\"",
+            "countMatches": true,
+            "results": [
+              {
+                "file": "app/bg-shlink-mcp/pyproject.toml",
+                "hasChanged": true,
+                "numMatches": 1,
+                "numReplacements": 1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "CHANGELOG.md",
+          "app/bg-shlink-mcp/pyproject.toml"
+        ],
+        "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+      }
+    ],
+    "@semantic-release/github"
+  ]
+}

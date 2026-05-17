@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bauer-group/automation-templates/main/.github/config/docker-base-image-monitor/docker-base-images.schema.json",
+  "_description": "Shlink MCP stack — upstream images consumed via docker-compose + Dockerfile. The monitor tracks digests and triggers a release when an upstream image moves.",
+  "images": [
+    {
+      "name": "redis",
+      "image": "redis",
+      "tag": "8-alpine",
+      "variable": "REDIS_ALPINE_DIGEST",
+      "description": "Redis cache for OAuth client registrations (DCR + token store)"
+    },
+    {
+      "name": "python-alpine",
+      "image": "python",
+      "tag": "3.14-alpine",
+      "variable": "PYTHON_ALPINE_DIGEST",
+      "description": "Base image for the bg-shlink-mcp container (app/bg-shlink-mcp/Dockerfile)"
+    }
+  ],
+  "settings": {
+    "commit-prefix": "chore(deps)",
+    "auto-create-variables": true
+  }
+}
