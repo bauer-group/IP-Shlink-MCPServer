@@ -54,18 +54,20 @@ METHOD_ANNOTATIONS: dict[str, ToolAnnotations] = {
 # Order matters - first match wins. Anything not matched stays a Tool (default).
 
 SHLINK_ROUTE_MAPS: list[RouteMap] = [
+    # Patterns match the POST-normalisation form (see `_normalize_spec_for_v3`):
+    # `/rest/v{version}` has already been stripped from spec paths by the time
+    # FastMCP sees them, so every pattern below is version-prefix-free.
+
     # Health probe -> Resource (read-only, no side effects, surfaced as shlink://health).
-    # Pattern accepts both concrete (/rest/v3/health) and templated
-    # (/rest/v{version}/health) paths — Shlink ships the spec with the templated
-    # form, but a hand-pinned spec or test stub might use a concrete version.
-    RouteMap(pattern=r"^/rest/v(?:\d+|\{[^}]+\})/health$", mcp_type=MCPType.RESOURCE),
     RouteMap(pattern=r"^/health$", mcp_type=MCPType.RESOURCE),
 
     # Mercure / SSE event endpoints aren't useful to an LLM and confuse the schema.
-    RouteMap(pattern=r"^/rest/v(?:\d+|\{[^}]+\})/mercure-info$", mcp_type=MCPType.EXCLUDE),
+    RouteMap(pattern=r"^/mercure-info$", mcp_type=MCPType.EXCLUDE),
 
-    # rules/* and tags/parse-csv are administrative subroutes we don't want exposed.
-    RouteMap(pattern=r"^/rest/v(?:\d+|\{[^}]+\})/rules", mcp_type=MCPType.EXCLUDE),
+    # Administrative subroutes we don't want exposed (top-level /rules, not
+    # /short-urls/{shortCode}/redirect-rules which we DO want — name overrides
+    # surface those as get_redirect_rules / set_redirect_rules).
+    RouteMap(pattern=r"^/rules", mcp_type=MCPType.EXCLUDE),
 ]
 
 
@@ -124,6 +126,9 @@ DESCRIPTION_OVERRIDES: dict[str, str] = {
 }
 
 
+_VERSION_PREFIX_RE = re.compile(r"^/rest/v(?:\d+|\{[^}]+\})")
+
+
 def _normalize_path(path: str) -> str:
     """Strip the version prefix so (method, path) overrides match either form.
 
@@ -131,7 +136,53 @@ def _normalize_path(path: str) -> str:
     forms — Shlink ships the spec with the templated form, but a hand-pinned
     spec or test stub might use a concrete version number.
     """
-    return re.sub(r"^/rest/v(?:\d+|\{[^}]+\})", "", path) or "/"
+    return _VERSION_PREFIX_RE.sub("", path) or "/"
+
+
+def _normalize_spec_for_v3(spec: dict[str, Any]) -> dict[str, Any]:
+    """Strip `/rest/v{version}` from paths and drop the `version` path param.
+
+    Shlink's spec models the API major as a templated path segment
+    (`/rest/v{version}/short-urls`, `version` required, `enum: ['3','2','1']`).
+    Two problems if we leave it untouched:
+      1. `ShlinkClient` already bakes `/rest/v3` into the httpx base_url, so
+         FastMCP appends a SECOND copy — every call lands on `/rest/v3/rest/v3/…`
+         and Shlink 404s.
+      2. `version` would surface as a required argument on every generated tool,
+         forcing the LLM to learn an API-versioning quirk that is purely an
+         operator-side decision.
+
+    Pinning to v3 here is consistent with `Settings.shlink_api_base` and matches
+    what the test stubs in `tests/test_tool_mapper.py` already assume.
+    """
+    paths = spec.get("paths")
+    if not isinstance(paths, dict):
+        return spec
+
+    new_paths: dict[str, Any] = {}
+    for raw_path, path_item in paths.items():
+        new_key = _VERSION_PREFIX_RE.sub("", raw_path) or "/"
+        if isinstance(path_item, dict):
+            new_item: dict[str, Any] = {}
+            for method, operation in path_item.items():
+                if isinstance(operation, dict) and isinstance(operation.get("parameters"), list):
+                    operation = {
+                        **operation,
+                        "parameters": [
+                            p for p in operation["parameters"]
+                            if not (
+                                isinstance(p, dict)
+                                and p.get("in") == "path"
+                                and p.get("name") == "version"
+                            )
+                        ],
+                    }
+                new_item[method] = operation
+            new_paths[new_key] = new_item
+        else:
+            new_paths[new_key] = path_item
+
+    return {**spec, "paths": new_paths}
 
 
 def _build_mcp_names_map(spec: dict[str, Any]) -> dict[str, str]:
@@ -262,6 +313,8 @@ def build_mcp_from_spec(
     in server.py. This function is unit-testable with a stub spec + httpx client.
     """
     counters = _BuildCounters()
+
+    spec = _normalize_spec_for_v3(spec)
 
     kwargs: dict[str, Any] = {
         "openapi_spec": spec,

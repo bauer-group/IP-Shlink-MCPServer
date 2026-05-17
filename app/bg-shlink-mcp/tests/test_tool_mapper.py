@@ -57,6 +57,62 @@ def test_route_map_excludes_mercure():
     assert any("mercure-info" in str(p) for p in pattern_strings)
 
 
+def test_normalize_spec_strips_version_prefix_and_drops_version_param():
+    """Root-cause fix for the double `/rest/v3` bug.
+
+    Shlink ships paths like `/rest/v{version}/short-urls`; our httpx base_url
+    already ends in `/rest/v3`. Without normalisation, FastMCP appends a
+    SECOND `/rest/v3` and Shlink 404s. After normalisation the path is just
+    `/short-urls` and the `version` path parameter is gone from the operation.
+    """
+    spec = _spec_with({
+        "/rest/v{version}/short-urls": {
+            "get": {
+                "operationId": "listShortUrls",
+                "parameters": [
+                    {"name": "version", "in": "path", "required": True,
+                     "schema": {"type": "string", "enum": ["3", "2", "1"]}},
+                    {"name": "page", "in": "query",
+                     "schema": {"type": "integer"}},
+                ],
+            },
+        },
+    })
+    normalised = tool_mapper._normalize_spec_for_v3(spec)
+
+    # Path was rewritten — `/rest/v{version}` prefix is gone.
+    assert "/short-urls" in normalised["paths"]
+    assert "/rest/v{version}/short-urls" not in normalised["paths"]
+
+    # `version` path-param dropped, query params survive.
+    params = normalised["paths"]["/short-urls"]["get"]["parameters"]
+    param_names = [p["name"] for p in params]
+    assert "version" not in param_names
+    assert "page" in param_names
+
+
+def test_normalize_spec_leaves_non_versioned_paths_untouched():
+    spec = _spec_with({
+        "/short-urls": {"get": {"operationId": "x", "parameters": []}},
+        "/health": {"get": {"operationId": "h"}},
+    })
+    normalised = tool_mapper._normalize_spec_for_v3(spec)
+    assert set(normalised["paths"]) == {"/short-urls", "/health"}
+
+
+def test_normalize_spec_does_not_mutate_input():
+    """SpecCache reuses the input dict; mutation would corrupt cached state."""
+    spec = _spec_with({
+        "/rest/v{version}/x": {
+            "get": {"parameters": [{"name": "version", "in": "path"}]},
+        },
+    })
+    original_paths = list(spec["paths"].keys())
+    tool_mapper._normalize_spec_for_v3(spec)
+    assert list(spec["paths"].keys()) == original_paths
+    assert spec["paths"]["/rest/v{version}/x"]["get"]["parameters"][0]["name"] == "version"
+
+
 async def test_catalogue_renders_empty_when_no_tools():
     class _StubMcp:
         async def list_tools(self):
