@@ -1,3 +1,9 @@
+## [0.5.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.0...v0.5.1) (2026-05-17)
+
+### ♻️ Refactoring
+
+* **scripts:** made dev-inspector build-from-source by default ([31eecaa](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/31eecaada68653862e36eb1234b11ec81fff8809))
+
 ## [0.5.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.4.0...v0.5.0) (2026-05-17)
 
 ### 🚀 Features
