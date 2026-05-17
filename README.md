@@ -12,7 +12,7 @@
 
 ## Highlights
 
-| | |
+| Feature | What it means |
 | --- | --- |
 | **AI-ready** | Auto-derives its tool surface from Shlink's OpenAPI spec — every endpoint of Shlink REST v3 is callable from any MCP-aware AI assistant |
 | **Identity-gated** | OAuth 2.1 + PKCE on the inbound side via Entra ID (single/multi-tenant), Google Workspace, or any generic OIDC provider (Authentik, Keycloak, Zitadel, Auth0, Okta, …) |
@@ -20,6 +20,7 @@
 | **Multi-arch** | `linux/amd64` and `linux/arm64` images on GHCR |
 | **Three deploy flavours** | Local development, self-hosted Traefik, Coolify-managed — same image, same source |
 | **Test-gated builds** | The Docker multi-stage build fails if pytest fails (no green push when tests are red) |
+| **Pinned tool surface** | Shlink's OpenAPI spec is baked into the image at build time — no startup HTTP fetch, deterministic per image tag; override `SHLINK_OPENAPI_URL` at runtime to track a live source |
 | **Restart-safe sessions** | Redis-backed OAuth client store with Fernet at-rest encryption — redeploys don't log users out |
 
 ---
@@ -126,7 +127,8 @@ IP-Shlink-MCPServer/
 ├── docker-compose.coolify.yml       ← Coolify deployment
 │
 ├── scripts/
-│   └── generate-env.py              ← cross-platform .env secret generator
+│   ├── generate-env.py              ← cross-platform .env secret generator
+│   └── dev-inspector.py             ← one-command MCP Inspector launcher
 │
 ├── app/
 │   └── bg-shlink-mcp/               ← the only image this repo builds
@@ -143,11 +145,13 @@ IP-Shlink-MCPServer/
 │       │   │   ├── entra.py
 │       │   │   ├── google.py
 │       │   │   └── generic_oidc.py
-│       │   └── shlink/
-│       │       ├── client.py
-│       │       ├── errors.py
-│       │       ├── openapi_loader.py
-│       │       └── tool_mapper.py
+│       │   ├── shlink/
+│       │   │   ├── client.py
+│       │   │   ├── errors.py
+│       │   │   ├── openapi_loader.py
+│       │   │   └── tool_mapper.py
+│       │   └── static/
+│       │       └── index.html       ← landing page served at /
 │       └── tests/                   ← pytest (53 tests, gates Docker build)
 │
 ├── docs/
@@ -155,6 +159,7 @@ IP-Shlink-MCPServer/
 │   ├── installation.md
 │   ├── authentication.md
 │   ├── client-setup.md
+│   ├── testing.md                   ← Inspector workflows (local + remote)
 │   ├── tools.md                     ← CI-generated tool catalogue
 │   └── troubleshooting.md
 │
@@ -176,7 +181,7 @@ IP-Shlink-MCPServer/
 | Component | Tested | Notes |
 | --- | --- | --- |
 | Python | 3.13 / 3.14 | Container ships 3.14 Alpine |
-| Shlink | v3.x / v4.x / v5.x | OpenAPI spec is fetched at runtime |
+| Shlink | v3.x / v4.x / v5.x | OpenAPI spec baked in at build time (default `v5.0.1`, pin via `SHLINK_OPENAPI_VERSION` build-arg) |
 | FastMCP | ≥ 2.13 | `OIDCProxy`, `AzureProvider`, `GoogleProvider` |
 | Redis | 7.x / 8.x | OAuth client storage (production) |
 
