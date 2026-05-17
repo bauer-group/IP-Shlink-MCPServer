@@ -1,0 +1,79 @@
+# =============================================================================
+# Shlink MCP Server — .gitignore
+# =============================================================================
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+.env.bak
+.env.production-local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+.eggs/
+build/
+dist/
+sdist/
+wheels/
+*.whl
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache
+.hypothesis/
+nosetests.xml
+coverage.xml
+*.cover
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.venv-test/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker / runtime
+*.pid
+*.log
+*.log.*
+
+# Local OpenAPI spec cache (developer may pin a copy)
+spec-cache/
+shlink-openapi.json
+shlink-openapi.yaml
+
+# Generated docs (CI re-creates from live spec)
+docs/tools.md
+
+# OS / temp
+.DS_Store
+Thumbs.db
+desktop.ini
