@@ -1,0 +1,130 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bg-shlink-mcp"
+version = "0.1.0"
+description = "BAUER GROUP Shlink MCP Server — OIDC-gated remote MCP bridge for self-hosted Shlink"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "BAUER GROUP", email = "info@bauer-group.com" },
+    { name = "Karl Bauer", email = "karl.bauer@bauer-group.com" },
+]
+requires-python = ">=3.13"
+keywords = ["mcp", "shlink", "oauth", "fastmcp", "url-shortener", "ai", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: System :: Networking",
+]
+dependencies = [
+    # MCP framework — auto-generates the tool surface from OpenAPI and ships
+    # the Entra / Google / OAuthProxy providers we depend on.
+    "fastmcp>=2.13.0,<3.0.0",
+
+    # Async HTTP — used by FastMCP internally and by our Shlink client wrapper.
+    "httpx>=0.28.1,<1.0.0",
+
+    # Type-safe environment-based configuration.
+    "pydantic>=2.10.0,<3.0.0",
+    "pydantic-settings>=2.14.1,<3.0.0",
+
+    # CLI surface: `serve`, `tools`, `health`.
+    "typer>=0.15.0,<1.0.0",
+
+    # Structured logging + pretty dev console.
+    "structlog>=24.4.0,<26.0.0",
+    "rich>=13.7.0,<15.0.0",
+
+    # Optional Redis-backed OAuth client store + at-rest Fernet encryption.
+    "redis>=5.2.0,<7.0.0",
+    "cryptography>=43.0.0,<46.0.0",
+
+    # Optional error tracking — loaded lazily, controlled by SENTRY_DSN.
+    "sentry-sdk>=2.18.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.0,<9.0.0",
+    "pytest-asyncio>=0.24.0,<2.0.0",
+    "pytest-httpx>=0.35.0,<1.0.0",
+    "pytest-cov>=6.0.0,<7.0.0",
+    "respx>=0.22.0,<1.0.0",
+]
+dev = [
+    "ruff>=0.7.0",
+    "mypy>=1.13.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/bauer-group/IP-Shlink-MCPServer"
+Source = "https://github.com/bauer-group/IP-Shlink-MCPServer"
+Issues = "https://github.com/bauer-group/IP-Shlink-MCPServer/issues"
+
+[project.scripts]
+bg-shlink-mcp = "main:app"
+
+# ── Hatch build configuration ──────────────────────────────────────────────
+# We ship a top-level package laid out under src/ - this points the wheel at it.
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+# ── Tooling ────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pydantic._internal.*",
+    "ignore::DeprecationWarning:starlette.*",
+]
+markers = [
+    "integration: marks tests that hit external services (deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+# Global gate is conservative because CLI / server-lifespan / FastMCP wiring
+# is integration-tested, not unit-tested. The critical security-and-correctness
+# modules (config, auth, shlink.client, shlink.errors) sit comfortably above
+# 90% individually - check the per-module column when reviewing.
+fail_under = 60
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
