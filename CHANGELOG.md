@@ -1,3 +1,11 @@
+## [0.2.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.1.0...v0.2.0) (2026-05-17)
+
+### 🚀 Features
+
+* **dev:** added dev-inspector helper for one-command Inspector flows ([495387b](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/495387ba03a27b8633601a8bb593c1d9389fd096))
+* **http:** added human-readable landing page at / ([7b289ed](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/7b289ed8dff446e1eb98f98002fd18bd3fffcb05))
+* **image:** baked OpenAPI spec at build time, renamed prod stage ([b958cac](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/b958cacfad58ac1b8c1cf4bccf150494b5b96f7e))
+
 ## [0.1.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.0.0...v0.1.0) (2026-05-17)
 
 ### 🚀 Features
