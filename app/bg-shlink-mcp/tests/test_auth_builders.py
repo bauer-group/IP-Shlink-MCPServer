@@ -56,6 +56,7 @@ def test_entra_single_passes_tenant_and_scopes(monkeypatch):
         ENTRA_CLIENT_ID="cid",
         ENTRA_CLIENT_SECRET="csecret",
         ENTRA_TENANT_ID="t-guid-1",
+        ENTRA_API_SCOPES="access_as_user, shlink.admin",
         ENTRA_EXTRA_SCOPES="User.Read, Calendars.Read",
     )
 
@@ -70,9 +71,57 @@ def test_entra_single_passes_tenant_and_scopes(monkeypatch):
     assert captured["client_id"] == "cid"
     assert captured["client_secret"] == "csecret"
     assert captured["tenant_id"] == "t-guid-1"
-    assert "openid" in captured["required_scopes"]
-    assert "User.Read" in captured["required_scopes"]
-    assert "Calendars.Read" in captured["required_scopes"]
+
+    # Custom API scopes -> required_scopes (validated against `scp` claim).
+    # OIDC scopes are forbidden here in fastmcp 3.x.
+    assert captured["required_scopes"] == ["access_as_user", "shlink.admin"]
+    assert "openid" not in captured["required_scopes"]
+
+    # OIDC + Graph permissions -> additional_authorize_scopes (consent only,
+    # not validated). offline_access is added by AzureProvider itself.
+    additional = captured["additional_authorize_scopes"]
+    assert "openid" in additional
+    assert "profile" in additional
+    assert "email" in additional
+    assert "User.Read" in additional
+    assert "Calendars.Read" in additional
+
+
+def test_entra_default_api_scope_used_when_unset(monkeypatch):
+    """If the operator omits ENTRA_API_SCOPES, fall back to access_as_user."""
+    settings = _settings_with(
+        monkeypatch,
+        AUTH_MODE="entra-single",
+        ENTRA_CLIENT_ID="cid",
+        ENTRA_CLIENT_SECRET="csecret",
+        ENTRA_TENANT_ID="t-guid-1",
+    )
+
+    Stub, captured = _capture_factory()
+    import fastmcp.server.auth.providers.azure as azure_mod
+
+    monkeypatch.setattr(azure_mod, "AzureProvider", Stub)
+    from auth.entra import build_entra_provider
+
+    build_entra_provider(settings)
+    assert captured["required_scopes"] == ["access_as_user"]
+
+
+def test_entra_rejects_empty_api_scopes(monkeypatch):
+    """Explicitly empty ENTRA_API_SCOPES must fail before reaching AzureProvider."""
+    settings = _settings_with(
+        monkeypatch,
+        AUTH_MODE="entra-single",
+        ENTRA_CLIENT_ID="cid",
+        ENTRA_CLIENT_SECRET="csecret",
+        ENTRA_TENANT_ID="t-guid-1",
+        ENTRA_API_SCOPES="",
+    )
+
+    from auth.entra import build_entra_provider
+
+    with pytest.raises(ValueError, match="ENTRA_API_SCOPES"):
+        build_entra_provider(settings)
 
 
 def test_entra_multi_passes_organizations(monkeypatch):

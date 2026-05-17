@@ -5,6 +5,20 @@ Both modes use FastMCP's AzureProvider. The single-tenant case is the simple
 default; the multi-tenant case requires a post-issuance allowlist check on
 the `tid` claim - without it, Microsoft would happily mint tokens for *any*
 tenant on Earth and let them call our MCP.
+
+Scope model (Azure-specific - do not conflate the two lists):
+
+- `required_scopes` (= settings.entra_api_scopes): custom API scopes you
+  EXPOSED in the Azure app registration under "Expose an API". These appear
+  in the `scp` claim of access tokens issued for *your* API and are what
+  AzureProvider actually validates. At least one non-OIDC scope is mandatory
+  by FastMCP 3.x.
+- `additional_authorize_scopes` (= OIDC defaults + settings.entra_extra_scopes):
+  scopes requested DURING authorization but never validated on incoming
+  tokens. Microsoft Graph delegated permissions (e.g. `User.Read`) belong
+  here - they end up in tokens audience-scoped to Graph, not our API.
+  `offline_access` is auto-added by AzureProvider; we include the other
+  OIDC scopes here so the consent screen still shows them.
 """
 
 from __future__ import annotations
@@ -17,8 +31,10 @@ from config import AuthMode, Settings
 
 logger = structlog.stdlib.get_logger("bg-shlink-mcp.auth.entra")
 
-# Standard delegated scopes Entra needs for OIDC + refresh tokens.
-_DEFAULT_SCOPES: tuple[str, ...] = ("openid", "profile", "email", "offline_access")
+# OIDC scopes are requested during authorization (so the consent screen lists
+# them and we get an id_token) but they're never present in the access token's
+# scp claim - hence not validatable and not part of required_scopes.
+_OIDC_AUTHORIZE_SCOPES: tuple[str, ...] = ("openid", "profile", "email")
 
 
 def build_entra_provider(settings: Settings) -> Any:
@@ -35,7 +51,19 @@ def build_entra_provider(settings: Settings) -> Any:
         # Defensive - Pydantic should have caught this already.
         raise ValueError("Entra provider requires client_id, client_secret, tenant_id")
 
-    scopes = list(_DEFAULT_SCOPES) + list(settings.entra_extra_scopes)
+    api_scopes = list(settings.entra_api_scopes)
+    if not api_scopes:
+        raise ValueError(
+            "ENTRA_API_SCOPES must contain at least one custom API scope "
+            "(e.g. 'access_as_user'). Expose it in the Azure app registration "
+            "under 'Expose an API' and grant admin consent."
+        )
+
+    # Authorization-time scopes: OIDC + any extras (Graph delegated permissions
+    # such as User.Read). These are surfaced to the user on the consent screen
+    # but are NOT validated against incoming tokens.
+    additional_authorize_scopes = list(_OIDC_AUTHORIZE_SCOPES) + list(settings.entra_extra_scopes)
+
     tenant_id = settings.entra_tenant_id
 
     if settings.auth_mode is AuthMode.ENTRA_MULTI and tenant_id not in ("common", "organizations", "consumers"):
@@ -51,7 +79,8 @@ def build_entra_provider(settings: Settings) -> Any:
         client_secret=settings.entra_client_secret.get_secret_value(),
         tenant_id=tenant_id,
         base_url=str(settings.public_base_url),
-        required_scopes=scopes,
+        required_scopes=api_scopes,
+        additional_authorize_scopes=additional_authorize_scopes,
     )
 
     logger.info(
@@ -59,7 +88,8 @@ def build_entra_provider(settings: Settings) -> Any:
         mode=settings.auth_mode.value,
         tenant_id=tenant_id,
         allowed_tenants=settings.entra_allowed_tenants or None,
-        scopes=scopes,
+        api_scopes=api_scopes,
+        additional_authorize_scopes=additional_authorize_scopes,
     )
     return provider
 

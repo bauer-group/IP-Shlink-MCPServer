@@ -31,6 +31,18 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ```
 Paste into `.env` as `AUTH_STORAGE_ENCRYPTION_KEY=`.
 
+### `ValueError: AzureProvider requires at least one non-OIDC scope in required_scopes`
+
+FastMCP 3.x refuses to start if `ENTRA_API_SCOPES` is empty or contains only OIDC
+scopes. Custom API scopes (e.g. `access_as_user`) must exist in the Azure app
+registration under "Expose an API" — OIDC scopes never appear in Azure access
+token `scp` claims and can't be enforced. Two fixes:
+
+- **If the scope is missing in Azure:** add one via `scripts/setup-azure-app.ps1`
+  / `.sh` or follow [docs/authentication.md → Manual setup → step 3](authentication.md#3-expose-an-api).
+- **If the scope exists but you renamed it:** set `ENTRA_API_SCOPES=<your-name>`
+  in `.env` (default is `access_as_user`).
+
 ### Container starts but `/healthz` returns 5xx
 
 Check the boot logs:
@@ -74,9 +86,23 @@ fresh secret and copy the value column.
 
 ### `400 Bad Request: invalid_scope`
 
-Your IdP doesn't recognise one of the scopes in `ENTRA_EXTRA_SCOPES` or
-`OIDC_SCOPES`. Trim down to just `openid profile email offline_access` first,
-then add scopes incrementally.
+The IdP doesn't recognise a scope being requested at authorization time. Per
+provider:
+
+- **Entra:** check `ENTRA_API_SCOPES` — the value must match a scope you've
+  exposed under "Expose an API" in the app registration (default
+  `access_as_user`). Then check `ENTRA_EXTRA_SCOPES` for typos in Graph
+  delegated permissions (e.g. `User.Read`, `Mail.Read`).
+- **Generic OIDC:** check `OIDC_SCOPES`. Trim to `openid profile email` first,
+  then add scopes incrementally.
+
+### `401 insufficient_scope` after successful login
+
+Token validation rejected the access token. Almost always: the Azure app
+registration's manifest still has `accessTokenAcceptedVersion` (or
+`requestedAccessTokenVersion`) set to `null` or `1`. Legacy v1 tokens carry
+their scope in `roles`, not `scp` — FastMCP only reads `scp`. Set the manifest
+property to `2` and re-authenticate.
 
 ### Tokens stop working after every redeploy
 

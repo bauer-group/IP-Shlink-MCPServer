@@ -119,7 +119,24 @@ class Settings(BaseSettings):
     entra_client_secret: SecretStr | None = None
     entra_tenant_id: str | None = None
     entra_allowed_tenants: Annotated[list[str], NoDecode] = Field(default_factory=list)
-    entra_extra_scopes: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    entra_api_scopes: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["access_as_user"],
+        description=(
+            "Custom API scopes exposed under 'Expose an API' in the Azure app "
+            "registration. Unprefixed names; AzureProvider prefixes them with "
+            "api://<client_id>/ before validating the token's scp claim. "
+            "Must contain at least one non-OIDC scope - OIDC scopes never "
+            "appear in Azure access tokens."
+        ),
+    )
+    entra_extra_scopes: Annotated[list[str], NoDecode] = Field(
+        default_factory=list,
+        description=(
+            "Upstream scopes requested during authorization but NOT validated "
+            "(e.g. Microsoft Graph delegated permissions like 'User.Read'). "
+            "Passed to AzureProvider's additional_authorize_scopes."
+        ),
+    )
 
     # Google
     google_client_id: str | None = None
@@ -152,6 +169,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "entra_allowed_tenants",
+        "entra_api_scopes",
         "entra_extra_scopes",
         "google_allowed_domains",
         mode="before",
