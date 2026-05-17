@@ -10,16 +10,9 @@
       }
     ],
     [
-      "@google/semantic-release-replace-plugin",
+      "@semantic-release/exec",
       {
-        "replacements": [
-          {
-            "files": ["app/bg-shlink-mcp/pyproject.toml"],
-            "from": "^version = \".*\"",
-            "to": "version = \"${nextRelease.version}\"",
-            "countMatches": true
-          }
-        ]
+        "prepareCmd": "sed -i -E 's/^version = \".*\"/version = \"${nextRelease.version}\"/' app/bg-shlink-mcp/pyproject.toml"
       }
     ],
     [
