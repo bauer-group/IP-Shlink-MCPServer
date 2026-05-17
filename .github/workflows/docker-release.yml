@@ -64,6 +64,7 @@ jobs:
       target-branch: 'main'
       dry-run: false
       force-release: ${{ inputs.force-release || false }}
+      extra-plugins: '@google/semantic-release-replace-plugin'
     secrets: inherit
 
   # ============================================

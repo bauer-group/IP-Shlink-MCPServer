@@ -10,9 +10,22 @@
       }
     ],
     [
+      "@google/semantic-release-replace-plugin",
+      {
+        "replacements": [
+          {
+            "files": ["app/bg-shlink-mcp/pyproject.toml"],
+            "from": "^version = \".*\"",
+            "to": "version = \"${nextRelease.version}\"",
+            "countMatches": true
+          }
+        ]
+      }
+    ],
+    [
       "@semantic-release/git",
       {
-        "assets": ["CHANGELOG.md"],
+        "assets": ["CHANGELOG.md", "app/bg-shlink-mcp/pyproject.toml"],
         "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
       }
     ],
