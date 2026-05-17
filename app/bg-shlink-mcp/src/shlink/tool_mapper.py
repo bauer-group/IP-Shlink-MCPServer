@@ -22,8 +22,32 @@ import httpx
 import structlog
 from fastmcp import FastMCP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
+from mcp.types import ToolAnnotations
 
 logger = structlog.stdlib.get_logger("bg-shlink-mcp.tool_mapper")
+
+
+# ── Approval gate: HTTP method → MCP tool annotations ──────────────────────
+# Shlink's API key has no read-only mode (its role system gates SCOPE, not
+# OPERATION — see scripts/generate-shlink-key.py for the upstream context).
+# Read/write separation is enforced here instead: every generated tool gets
+# annotations that tell MCP clients (Claude Desktop, Inspector, ...) which
+# calls are safe to auto-run and which need human approval.
+#
+# Per MCP spec, these are HINTS — clients are free to ignore them, so this
+# is defense-in-depth, not authorization. Keep the Shlink key on a need-to-
+# know basis regardless.
+#
+# Policy: GET is safe-to-auto, everything else needs approval. POST counts
+# as destructive because it creates state that costs effort to clean up
+# (deleted-and-recreated short URLs lose their visit history).
+METHOD_ANNOTATIONS: dict[str, ToolAnnotations] = {
+    "GET":    ToolAnnotations(readOnlyHint=True,  destructiveHint=False, openWorldHint=True),
+    "POST":   ToolAnnotations(readOnlyHint=False, destructiveHint=True,  idempotentHint=False, openWorldHint=True),
+    "PUT":    ToolAnnotations(readOnlyHint=False, destructiveHint=True,  idempotentHint=True,  openWorldHint=True),
+    "PATCH":  ToolAnnotations(readOnlyHint=False, destructiveHint=True,  idempotentHint=True,  openWorldHint=True),
+    "DELETE": ToolAnnotations(readOnlyHint=False, destructiveHint=True,  idempotentHint=True,  openWorldHint=True),
+}
 
 
 # ── Route filter ────────────────────────────────────────────────────────────
@@ -149,10 +173,13 @@ def build_mcp_from_spec(
 
     mcp = FastMCP.from_openapi(**kwargs)
     _apply_description_overrides(mcp)
+    annotated, skipped = _apply_tool_annotations(mcp)
     logger.info(
         "tools.generated",
         tool_count=_count_registered_tools(mcp),
         resource_count=_count_registered_resources(mcp),
+        tools_annotated=annotated,
+        tools_unannotated=skipped,
     )
     return mcp
 
@@ -170,6 +197,39 @@ def _apply_description_overrides(mcp: FastMCP) -> None:
             except AttributeError:
                 # Newer FastMCP versions may use a frozen model - log and move on.
                 logger.debug("tools.description_override_skipped", tool=tool_name)
+
+
+def _apply_tool_annotations(mcp: FastMCP) -> tuple[int, int]:
+    """
+    Tag every OpenAPI-derived tool with method-appropriate annotations so MCP
+    clients know which calls are safe to auto-run vs. need human approval.
+
+    Returns (annotated_count, skipped_count). Skipped tools (missing _route
+    or frozen annotation slot) are logged at DEBUG; they fall back to MCP
+    defaults, which treat unknown tools as destructive — the safe default.
+    """
+    registry = getattr(mcp, "_tool_manager", None) or getattr(mcp, "tool_manager", None)
+    if registry is None:
+        return (0, 0)
+    tools = getattr(registry, "_tools", None) or getattr(registry, "tools", None) or {}
+
+    annotated = 0
+    skipped = 0
+    for tool_name, tool in tools.items():
+        route = getattr(tool, "_route", None)
+        method = (getattr(route, "method", None) or "").upper()
+        annotations = METHOD_ANNOTATIONS.get(method)
+        if annotations is None:
+            skipped += 1
+            logger.debug("tools.annotation_skipped", tool=tool_name, reason="unknown_method", method=method)
+            continue
+        try:
+            tool.annotations = annotations
+            annotated += 1
+        except (AttributeError, ValueError):
+            skipped += 1
+            logger.debug("tools.annotation_skipped", tool=tool_name, reason="frozen_model")
+    return (annotated, skipped)
 
 
 def _count_registered_tools(mcp: FastMCP) -> int:
