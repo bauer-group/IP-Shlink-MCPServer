@@ -1,3 +1,9 @@
+## [0.3.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.2.0...v0.3.0) (2026-05-17)
+
+### 🚀 Features
+
+* **security:** added approval gate via per-method MCP annotations ([076a96f](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/076a96fef7d608738f3e238bdffaf5b42b026114))
+
 ## [0.2.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.1.0...v0.2.0) (2026-05-17)
 
 ### 🚀 Features
