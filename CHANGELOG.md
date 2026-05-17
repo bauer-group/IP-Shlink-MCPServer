@@ -1,3 +1,9 @@
+## [0.4.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.3.0...v0.4.0) (2026-05-17)
+
+### 🚀 Features
+
+* **auth:** split Entra scopes for fastmcp 3.x and added provisioning scripts ([ec6d75d](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/ec6d75dd2079a293f814c57613fe8a7b8d3bd69f))
+
 ## [0.3.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.2.0...v0.3.0) (2026-05-17)
 
 ### 🚀 Features
