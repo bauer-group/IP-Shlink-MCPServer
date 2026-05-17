@@ -14,21 +14,32 @@
 #   docker build --build-arg SHLINK_OPENAPI_VERSION=v5.1.0 -t bg-shlink-mcp .
 # =============================================================================
 
-# ── Stage 1a: Spec — fetch Shlink OpenAPI spec at BUILD time ─────────────────
-# The spec is a pinned, immutable git-tag URL. Baking it into the image means
-# the container needs no network access to GitHub at startup, and reproducible
-# builds yield reproducible tool surfaces. Override per-build via --build-arg.
-FROM alpine:3 AS spec
+# ── Stage 1a: Spec — fetch + bundle Shlink OpenAPI spec at BUILD time ────────
+# Shlink ships the spec as a modular tree: swagger.json (index) + paths/*.json
+# fragments connected via relative $ref pointers. FastMCP.from_openapi() only
+# resolves internal #/components/... refs, so we dereference the tree into a
+# single self-contained JSON document here, before the production stage copies
+# it in. Pinned to a git tag for reproducible tool surfaces; override per-build
+# via --build-arg SHLINK_OPENAPI_VERSION=v5.x.y.
+FROM python:3.14-alpine AS spec
 
 ARG SHLINK_OPENAPI_VERSION=v5.0.1
 
-RUN apk add --no-cache curl ca-certificates \
+# Note: we use `git clone` instead of the tag tarball because Shlink's
+# `.gitattributes` marks docs/ as export-ignore — the archive served at
+# github.com/.../archive/refs/tags/... doesn't contain docs/swagger/ at all.
+# Raw file URLs and the git tree DO contain it, so a shallow single-branch
+# clone is the simplest reliable source.
+RUN apk add --no-cache git ca-certificates \
  && mkdir -p /spec \
- && curl -fsSL --retry 3 --retry-delay 2 \
-      "https://raw.githubusercontent.com/shlinkio/shlink/${SHLINK_OPENAPI_VERSION}/docs/swagger/swagger.json" \
-      -o /spec/shlink.json \
- && head -c 1 /spec/shlink.json | grep -q '{' \
-        || (echo "ERROR: fetched OpenAPI spec is not a JSON object" && cat /spec/shlink.json | head -c 200 && exit 1)
+ && git clone --depth 1 --branch "${SHLINK_OPENAPI_VERSION}" \
+      https://github.com/shlinkio/shlink.git /tmp/shlink \
+ && mv /tmp/shlink/docs/swagger /spec/raw \
+ && rm -rf /tmp/shlink
+
+COPY scripts/bundle-openapi.py /usr/local/bin/bundle-openapi.py
+RUN python3 /usr/local/bin/bundle-openapi.py /spec/raw/swagger.json /spec/shlink.json \
+ && rm -rf /spec/raw
 
 
 # ── Stage 1b: Builder — install Python dependencies into a relocatable prefix ──

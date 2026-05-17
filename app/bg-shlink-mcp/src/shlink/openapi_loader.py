@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import url2pathname
 
 import httpx
@@ -46,31 +46,45 @@ class SpecLoadError(RuntimeError):
 
 async def load_spec(source: str, *, timeout: float = 30.0) -> LoadedSpec:
     """
-    Fetch and parse the OpenAPI spec. Raises SpecLoadError on failure.
+    Fetch, parse, and dereference an OpenAPI spec. Raises SpecLoadError on failure.
 
     Accepts:
       - http(s)://host/path/spec.json|yaml
       - file:///absolute/path
-    """
-    parsed = urlparse(source)
-    if parsed.scheme in ("http", "https"):
-        raw = await _fetch_remote(source, timeout=timeout)
-    elif parsed.scheme == "file":
-        raw = _read_local(_file_url_to_path(source))
-    elif not parsed.scheme and os.path.exists(source):
-        raw = _read_local(source)
-    else:
-        raise SpecLoadError(f"Unsupported spec source scheme: {source!r}")
 
-    try:
-        spec = _parse(raw)
-    except ValueError as exc:
-        raise SpecLoadError(f"Failed to parse OpenAPI spec from {source}: {exc}") from exc
+    External `$ref` pointers (e.g. `"$ref": "paths/foo.json"`) are resolved
+    relative to the spec's own URI so unbundled-modular specs (like Shlink's
+    canonical swagger.json) work at runtime. Internal `#/...` refs are left
+    alone — FastMCP handles those itself. Bundled specs are a no-op for the
+    resolver (it walks the tree, finds no externals, returns unchanged).
+    """
+    spec = await _fetch_and_parse(source, timeout=timeout)
 
     if not isinstance(spec, dict):
         raise SpecLoadError(f"OpenAPI spec at {source} is not a JSON object")
     if "paths" not in spec:
         raise SpecLoadError(f"OpenAPI spec at {source} is missing the `paths` section")
+
+    try:
+        spec = await _resolve_external_refs(spec, source, timeout=timeout)
+    except SpecLoadError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — surface the chain with context
+        raise SpecLoadError(
+            f"Failed to resolve external $refs starting from {source}: {exc}"
+        ) from exc
+
+    operation_count = _count_operations(spec)
+    if operation_count == 0:
+        # A spec without operations produces zero MCP tools — the server would
+        # boot but serve nothing. This usually means external $refs in `paths`
+        # weren't resolved (e.g. the modular Shlink swagger.json wasn't bundled
+        # before being baked into the image). Fail fast at startup instead of
+        # silently shipping an empty tool surface.
+        raise SpecLoadError(
+            f"OpenAPI spec at {source} has 0 operations — `paths` is empty or "
+            f"contains only unresolved $refs. Did the build-time bundling step run?"
+        )
 
     info = spec.get("info", {}) if isinstance(spec.get("info"), dict) else {}
     return LoadedSpec(
@@ -78,8 +92,100 @@ async def load_spec(source: str, *, timeout: float = 30.0) -> LoadedSpec:
         source=source,
         info_version=info.get("version"),
         title=info.get("title"),
-        operation_count=_count_operations(spec),
+        operation_count=operation_count,
     )
+
+
+async def _fetch_and_parse(uri: str, *, timeout: float) -> Any:
+    """Fetch a JSON/YAML document from any supported URI scheme and parse it.
+
+    Centralised so the top-level loader and the recursive $ref resolver share
+    one fetch/parse path — keeps error messages and YAML-fallback consistent.
+    """
+    parsed = urlparse(uri)
+    if parsed.scheme in ("http", "https"):
+        raw = await _fetch_remote(uri, timeout=timeout)
+    elif parsed.scheme == "file":
+        raw = _read_local(_file_url_to_path(uri))
+    elif not parsed.scheme and os.path.exists(uri):
+        raw = _read_local(uri)
+    else:
+        raise SpecLoadError(f"Unsupported spec source scheme: {uri!r}")
+
+    try:
+        return _parse(raw)
+    except ValueError as exc:
+        raise SpecLoadError(f"Failed to parse OpenAPI spec from {uri}: {exc}") from exc
+
+
+def _resolve_ref_uri(base: str, ref: str) -> str:
+    """Resolve a relative `$ref` against a base URI, preserving the base's scheme.
+
+    For http(s)://: stdlib's `urljoin` handles "../", "/", and bare-filename
+    relatives correctly. For file:// and bare paths: parent-directory + ref,
+    normalised. Returns an absolute URI string ready for `_fetch_and_parse`.
+    """
+    parsed = urlparse(base)
+    if parsed.scheme in ("http", "https"):
+        return urljoin(base, ref)
+    if parsed.scheme == "file":
+        base_path = Path(_file_url_to_path(base))
+        return (base_path.parent / ref).resolve().as_uri()
+    # bare filesystem path
+    base_path = Path(base)
+    return str((base_path.parent / ref).resolve())
+
+
+async def _resolve_external_refs(
+    node: Any,
+    current_uri: str,
+    *,
+    timeout: float,
+    seen: tuple[str, ...] = (),
+) -> Any:
+    """Recursively inline external `$ref` pointers found anywhere in `node`.
+
+    Only external refs (those without a `#`-prefix) are resolved — internal
+    `#/components/...` refs are left in place because FastMCP's OpenAPI
+    provider resolves them during component generation. `seen` carries the
+    fetch-chain so a malformed spec with circular external refs raises with
+    a useful trace instead of recursing until the stack runs out.
+    """
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref and not ref.startswith("#"):
+            ref_path, _, fragment = ref.partition("#")
+            target_uri = _resolve_ref_uri(current_uri, ref_path)
+            if target_uri in seen:
+                chain = " -> ".join((*seen, target_uri))
+                raise SpecLoadError(f"Circular external $ref chain: {chain}")
+            sub = await _fetch_and_parse(target_uri, timeout=timeout)
+            if fragment:
+                for part in fragment.lstrip("/").split("/"):
+                    if not isinstance(sub, dict):
+                        raise SpecLoadError(
+                            f"Fragment {fragment!r} cannot traverse non-object node "
+                            f"while resolving {ref!r} from {current_uri}"
+                        )
+                    if part not in sub:
+                        raise SpecLoadError(
+                            f"Fragment part {part!r} not found in {target_uri} "
+                            f"(resolving {ref!r} from {current_uri})"
+                        )
+                    sub = sub[part]
+            return await _resolve_external_refs(
+                sub, target_uri, timeout=timeout, seen=(*seen, target_uri),
+            )
+        return {
+            key: await _resolve_external_refs(value, current_uri, timeout=timeout, seen=seen)
+            for key, value in node.items()
+        }
+    if isinstance(node, list):
+        return [
+            await _resolve_external_refs(item, current_uri, timeout=timeout, seen=seen)
+            for item in node
+        ]
+    return node
 
 
 async def _fetch_remote(url: str, *, timeout: float) -> str:
