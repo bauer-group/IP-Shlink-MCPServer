@@ -1,3 +1,11 @@
+## [0.6.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.2...v0.6.3) (2026-05-18)
+
+## [0.6.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.1...v0.6.2) (2026-05-18)
+
+### ♻️ Refactoring
+
+* **docker:** clean up Coolify and development configurations ([e7c8bfb](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/e7c8bfb033382404515fefd9b66cecb74e3c7fa0))
+
 ## [0.6.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.0...v0.6.1) (2026-05-18)
 
 ### 🐛 Bug Fixes
