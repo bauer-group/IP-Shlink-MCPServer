@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 
 import structlog
 
+from auth.middleware import TenantAllowlistMiddleware
 from auth.provider_factory import build_auth_provider
 from config import AuthMode, Settings, get_settings
 from extensions import load_extensions
@@ -115,6 +116,24 @@ async def build_app(settings: Settings | None = None) -> "FastMCP":
         icon_url=icon_url,
         website_url=website_url,
     )
+
+    # Tenant allowlist enforcement for entra-multi. AzureProvider only
+    # validates signature + issuer pattern; without this middleware, ANY
+    # consenting Entra tenant can call us. The list-empty case is treated
+    # as "intentionally any tenant" (single-tenant or first-party app).
+    if (
+        settings.auth_mode is AuthMode.ENTRA_MULTI
+        and settings.entra_allowed_tenants
+    ):
+        mcp.add_middleware(
+            TenantAllowlistMiddleware(
+                allowed_tenants=settings.entra_allowed_tenants,
+            )
+        )
+        logger.info(
+            "auth.tenant_allowlist_active",
+            allowed_tenants=settings.entra_allowed_tenants,
+        )
 
     # Layer operator-defined prompts / resource templates / export tasks on
     # top of the spec-derived tool surface. A missing config is skipped
