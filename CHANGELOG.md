@@ -1,3 +1,9 @@
+## [0.11.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.3...v0.11.0) (2026-05-18)
+
+### 🚀 Features
+
+* **network:** switched default MCP bind to dual-stack "::" ([35faca0](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/35faca0dc1184dc0c3ec2d93362f7a06b497a99b))
+
 ## [0.10.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.2...v0.10.3) (2026-05-18)
 
 ### 🐛 Bug Fixes
