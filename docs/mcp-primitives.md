@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # MCP Primitives & Server Features — Implementation Guide
 
 Companion reference for the eleven tabs you see in the MCP Inspector toolbar
@@ -22,18 +23,18 @@ Roots · Auth · Metadata**). For each one this guide answers:
 
 | Tab | Category | Who triggers? | Status here | One-line summary |
 | --- | --- | --- | --- | --- |
-| **Tools** | Component primitive | AI in the turn | **implemented** (25) | The AI calls them to *do* something |
-| **Resources** | Component primitive | User / client pins them | **not used** (0) | The AI *reads* them like files |
-| **Resource Templates** | Component primitive | User picks a URI | **not used** (0) | Parameterised resources (`shlink://short-url/{shortCode}`) |
-| **Prompts** | Component primitive | User picks a workflow | **not used** (0) | Pre-baked multi-tool workflows (slash-command-like) |
+| **Tools** | Component primitive | AI in the turn | **implemented** (25 spec-driven + 1 export task) | The AI calls them to *do* something |
+| **Resources** | Component primitive | User / client pins them | **implemented** (4 — config-driven) | The AI *reads* them like files |
+| **Resource Templates** | Component primitive | User picks a URI | **implemented** (6 — config-driven) | Parameterised resources (`shlink://short-url/{shortCode}`) |
+| **Prompts** | Component primitive | User picks a workflow | **implemented** (1 — config-driven) | Pre-baked multi-tool workflows (slash-command-like) |
 | **Apps** | UI extension on a component | Client renders | **not used** (0) | Tool/resource emits an HTML/UI snippet, client renders sandboxed |
-| **Tasks** | Execution mode | AI opts in | **not used** | Long-running tool calls — return task-ID, poll later |
+| **Tasks** | Execution mode | AI opts in | **implemented** (1 — `export_short_urls`) | Long-running tool calls — return task-ID, poll later |
 | **Ping** | Protocol plumbing | Either side | **automatic** | Keepalive — no app code needed |
 | **Sampling** | Server→client capability | Server, inside a tool | **not used** | Server asks the client's LLM for a completion |
 | **Elicitations** | Server→client capability | Server, inside a tool | **not used** | Server asks the user for missing input |
-| **Roots** | Client→server capability | Client advertises | **not used** | Filesystem scopes the client has granted to the server |
+| **Roots** | Client→server capability | Client advertises | **not applicable** | Remote MCP — no shared filesystem with the client |
 | **Auth** | Cross-cutting | Transport + per-component | **implemented** (OAuth 2.1) | Inbound identity gate + per-tool scope checks |
-| **Metadata** | Cross-cutting | Any component | **implemented** (annotations) | `_meta` / annotations carry hints the protocol doesn't standardise |
+| **Metadata** | Cross-cutting | Any component | **implemented** (annotations + tags) | `_meta` / annotations carry hints the protocol doesn't standardise |
 
 **Three layers in one toolbar.** The Inspector mixes things at different
 abstraction levels:
@@ -159,15 +160,23 @@ The function name doesn't matter; the **URI** is the public identifier.
 
 ### Status in `bg-shlink-mcp`
 
-**Not used (`resource_count=0`).** The route map declares `^/health$` →
-`MCPType.RESOURCE`, but Shlink's actual health path is `/rest/health` (not
-`/rest/v{version}/health`), so the regex never matches and the operation
-falls through to a tool. Three viable fixes:
+**Implemented (4 static resources).** Config-driven via
+[`extensions/extensions.json`](../app/bg-shlink-mcp/extensions/extensions.json),
+loaded by [`src/extensions/resources.py`](../app/bg-shlink-mcp/src/extensions/resources.py).
+Current catalogue:
 
-1. Add `^/rest/health$` to the route maps (one-liner)
-2. Hand-write a `@mcp.resource("shlink://health")` that calls
-   `ShlinkClient.health()` directly — bypasses the OpenAPI mapper
-3. Leave it as a tool — works fine, just less semantically pure
+| URI | Backend GET |
+| --- | --- |
+| `shlink://tags` | `/tags` |
+| `shlink://tags/stats` | `/tags/stats` |
+| `shlink://domains` | `/domains` |
+| `shlink://visits/summary` | `/visits` |
+| `shlink://visits/orphan` | `/visits/orphan` |
+
+Adding a new resource is a JSON edit — no Python required (see §13 for the
+config schema). The synthesised function is wired through `mcp.add_resource(...)`,
+which routes static URIs to `FunctionResource` and parameterised URIs to
+`ResourceTemplate` automatically.
 
 ### Pitfalls
 
@@ -211,14 +220,23 @@ detection rule.
 
 ### Status in `bg-shlink-mcp`
 
-**Not used.** Strong candidates for migration from tools to templates:
+**Implemented (5 templates).** Layered *next to* the original GET tools, not
+*instead of* — both surfaces work. AI clients that don't bind to resources
+keep using the tool; clients/users that prefer pin-able URIs get the template.
 
-| Current tool | Suggested template URI |
+| Template URI | Backend GET |
 | --- | --- |
-| `get_short_url(shortCode)` | `shlink://short-url/{shortCode}` |
-| `get_short_url_visits(shortCode)` | `shlink://short-url/{shortCode}/visits` |
-| `get_tag_visits(tag)` | `shlink://tag/{tag}/visits` |
-| `get_domain_visits(domain)` | `shlink://domain/{domain}/visits` |
+| `shlink://short-url/{shortCode}` | `/short-urls/{shortCode}` |
+| `shlink://short-url/{shortCode}/visits` | `/short-urls/{shortCode}/visits` |
+| `shlink://short-url/{shortCode}/redirect-rules` | `/short-urls/{shortCode}/redirect-rules` |
+| `shlink://tag/{tag}/visits` | `/tags/{tag}/visits` |
+| `shlink://domain/{domain}/visits` | `/domains/{domain}/visits` |
+
+Validation guards against drift: the
+[`ResourceConfig._placeholders_match`](../app/bg-shlink-mcp/src/extensions/config.py)
+validator rejects any config where the URI placeholders and the backend-path
+placeholders don't line up — so a `{shortCode}` in the URI without a
+matching `{shortCode}` in the backend path fails at boot.
 
 ### Pitfalls
 
@@ -272,11 +290,21 @@ Prompts can also return structured `PromptMessage` lists with role
 
 ### Status in `bg-shlink-mcp`
 
-**Not used.** Good candidates:
+**Implemented (1 prompt — `top_visits_report`).** Config-driven via
+[`extensions/extensions.json`](../app/bg-shlink-mcp/extensions/extensions.json),
+registered by [`src/extensions/prompts.py`](../app/bg-shlink-mcp/src/extensions/prompts.py).
+
+`top_visits_report(limit=20, days=30, exclude_bots=true)` orchestrates
+`list_short_urls` → `get_short_url_visits` (per URL) → ranked markdown
+table. The Python signature is **synthesised** from the JSON-declared
+arguments: a generic closure gets a real `inspect.Signature` attached so
+FastMCP introspects the parameter names, types, and defaults the same way
+it would for a hand-written `@mcp.prompt`.
+
+Further candidates (not yet wired — easy JSON additions):
 
 | Prompt name | Purpose |
 | --- | --- |
-| `weekly_link_report` | Top short URLs by visits + new-this-week |
 | `audit_short_url(shortCode)` | Visits + redirect rules + tags + creation date in one pass |
 | `tag_cleanup` | List orphan/low-visit tags, suggest merges or deletions |
 | `migrate_long_urls(from_domain, to_domain)` | Find + edit short URLs that point at one domain |
@@ -388,12 +416,35 @@ the AI.
 
 ### Status in `bg-shlink-mcp`
 
-**Not used.** Shlink answers in <500ms for all current operations, so
-every tool runs synchronously. Hypothetical future candidates:
+**Implemented (1 task — `export_short_urls`).** Bulk-exports the full
+short-URL inventory as CSV or JSON. Config-driven via
+[`extensions/extensions.json`](../app/bg-shlink-mcp/extensions/extensions.json);
+the Python logic lives in [`src/extensions/tasks.py`](../app/bg-shlink-mcp/src/extensions/tasks.py)
+as an abstract `Exporter` base with `ShortUrlExporter` as the first
+concrete subclass.
+
+**Why config-driven *registration* + class-based *execution*:** the
+operator decides whether the export exists, which formats are allowed,
+and how the task runs (`mode`, `poll_interval`, `ttl`) — JSON is the
+right tool. But pagination + CSV/JSON formatting is procedural Python
+that doesn't compress into config without ugly DSLs. The split keeps
+each layer working in its native medium.
+
+Adding a new exporter (e.g. tags, domains as CSV):
+
+1. Subclass `Exporter` in `tasks.py`, implement `fetch_all()`
+2. Register it in `_EXPORTERS = {"my_key": MyExporter, ...}`
+3. Reference it from `extensions.json` with `"exporter": "my_key"`
+
+No other code-path touches required.
+
+Further candidates:
 
 - `delete_visits_bulk(date_range=...)` — Shlink's `DELETE /visits` can be
   slow on million-visit instances
-- A future `regenerate_qr_codes(domain=...)` operator helper
+- `regenerate_qr_codes(domain=...)` operator helper
+- `export_visits(format=csv|jsonl, date_range=...)` — large export with
+  streaming output
 
 ### Pitfalls
 
@@ -732,45 +783,145 @@ async def create_short_url(...): ...
 
 ---
 
+## 13. The `extensions/extensions.json` config — schema reference
+
+All operator-defined prompts, resources, and tasks live in one JSON file
+baked into the image at `/app/extensions/extensions.json` (override via
+`EXTENSIONS_CONFIG_PATH`). The Pydantic models in
+[`src/extensions/config.py`](../app/bg-shlink-mcp/src/extensions/config.py)
+are the source of truth — they enforce `extra=forbid`, so typos in keys
+fail at boot rather than silently dropping an entry.
+
+### Top-level shape
+
+```json
+{
+  "$schema": "./extensions.schema.json",
+  "prompts":   [ /* PromptConfig */ ],
+  "resources": [ /* ResourceConfig */ ],
+  "tasks":     [ /* ExportTaskConfig */ ]
+}
+```
+
+Every section is optional and may be empty.
+
+### Prompt entry
+
+```json
+{
+  "name": "snake_case_identifier",
+  "title": "Human-Readable Name",
+  "description": "What the user sees in the picker.",
+  "tags": ["analytics"],
+  "arguments": [
+    {
+      "name": "limit",
+      "type": "integer",         // string | integer | number | boolean
+      "description": "What this argument means.",
+      "default": 20,             // optional; must match `type`
+      "required": false
+    }
+  ],
+  "template": "Top ${limit} results …"   // ${name} placeholders only
+}
+```
+
+Validation: every `${placeholder}` in the template must have a declared
+argument, every declared argument must appear in the template — config
+drift fails at boot.
+
+### Resource entry
+
+```json
+{
+  "uri": "shlink://short-url/{shortCode}",   // {placeholder} → template
+  "name": "Short URL Details",
+  "title": "Short URL",
+  "description": "…",
+  "mime_type": "application/json",
+  "tags": ["catalogue"],
+  "backend": {
+    "method": "GET",                          // only GET makes sense
+    "path": "/short-urls/{shortCode}"        // Shlink-relative path
+  }
+}
+```
+
+Validation: URI `{placeholder}`s and backend-path `{placeholder}`s must
+match exactly.
+
+### Task entry
+
+```json
+{
+  "name": "export_short_urls",
+  "title": "Export Short URLs",
+  "description": "…",
+  "tags": ["export"],
+  "exporter": "short_urls",                  // key into _EXPORTERS in tasks.py
+  "formats": ["csv", "json"],                // first entry is the default
+  "page_size": 200,
+  "task": {
+    "mode": "optional",                       // optional | required
+    "poll_interval_seconds": 2.0,
+    "ttl_seconds": 900
+  }
+}
+```
+
+Validation: `exporter` must reference a class registered in
+`_EXPORTERS` (Pydantic `Literal["short_urls"]`); `formats` must be
+non-empty and unique.
+
+---
+
 ## Implementation roadmap for `bg-shlink-mcp`
 
-Sorted by value-to-effort ratio.
+Sorted by value-to-effort ratio. Updated as features land.
 
-### Now (low risk, immediate user value)
+### Done
 
-1. **Resource for health.** Add `^/rest/health$` to `SHLINK_ROUTE_MAPS`
-   or hand-write a `@mcp.resource("shlink://health")`. Surfaces the
-   health probe as a pin-able resource in clients that support it.
-2. **Resource Templates for read-only GETs.** Migrate
-   `get_short_url`, `get_short_url_visits`, `get_tag_visits`,
-   `get_domain_visits` from tools to templates. ~10 lines per
-   migration; halves the LLM's "should I call a tool?" decisions.
+- ✅ **Spec-derived tool surface** — 25 tools from Shlink's OpenAPI
+- ✅ **Resource Templates** for read-only GETs (5 templates layered next
+  to the original tools)
+- ✅ **Static Resources** for catalogue endpoints (4 — tags, domains,
+  visits summary, orphan visits)
+- ✅ **Prompt — `top_visits_report`** (multi-tool workflow)
+- ✅ **Task — `export_short_urls`** (CSV/JSON bulk export with paginated
+  fetcher)
+- ✅ **OAuth 2.1 inbound auth** at the transport layer
+- ✅ **Per-method annotations** (`readOnlyHint` / `destructiveHint`)
 
-### Soon (clear user value, more design surface)
+### Now (low risk, clear value)
 
-3. **Two or three Prompts** for the most common multi-tool workflows:
-   - `weekly_link_report` — top short URLs + new this week
-   - `audit_short_url(shortCode)` — visits + redirect rules + tags in one
-   - `migrate_long_urls(from_domain, to_domain)` — bulk re-target
-4. **Elicitation for destructive operations.** Wrap `delete_short_url`,
-   `delete_tags`, `rename_tag` in an elicitation confirm step — stronger
-   guarantee than `destructiveHint`.
+- **More prompts.** `audit_short_url(shortCode)`, `tag_cleanup`,
+  `migrate_long_urls(from_domain, to_domain)`. Each is a JSON edit; no
+  Python required.
+- **Resource for health.** Either a JSON entry pointing at `/rest/health`
+  (the spec's real path, not `/rest/v{version}/health`) or a hand-written
+  `@mcp.resource("shlink://health")` that calls `ShlinkClient.health()`
+  directly.
+
+### Soon (clear value, more design surface)
+
+- **Elicitation for destructive operations.** Wrap `delete_short_url`,
+  `delete_tags`, `rename_tag` in an elicitation confirm step — stronger
+  guarantee than `destructiveHint`.
+- **More exporters.** `export_tags`, `export_domains`, `export_visits` —
+  each one is a new `Exporter` subclass + a JSON entry.
 
 ### Later (operator value, advanced)
 
-5. **Apps** for click-through charts and tag-cloud visualisations.
-6. **Per-tool Auth** scopes (`shlink.read`, `shlink.write`,
-   `shlink.delete`) — only when there's a multi-user deployment that
-   needs them.
-7. **Tasks** for any future bulk-mutation tool (`delete_visits_bulk`,
-   `regenerate_qr_codes`).
+- **Apps** for click-through charts and tag-cloud visualisations.
+- **Per-tool Auth scopes** (`shlink.read`, `shlink.write`, `shlink.delete`)
+  — only when there's a multi-user deployment that needs them.
 
 ### Probably never
 
-8. **Sampling** — every Shlink operation is deterministic. Sampling is a
-   bad fit unless we add an `auto_tag_short_url` style feature that
-   reasons about page content.
-9. **Roots** — remote MCP, no shared filesystem with the client.
+- **Sampling** — every Shlink operation is deterministic. Sampling is a
+  bad fit unless we add an `auto_tag_short_url` style feature that reasons
+  about page content.
+- **Roots** — remote MCP, no shared filesystem with the client.
 
 ---
 

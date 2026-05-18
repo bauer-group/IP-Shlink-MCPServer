@@ -68,6 +68,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY tests/ ./tests/
+COPY extensions/ ./extensions/
 
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir ".[test]"
@@ -129,6 +130,12 @@ COPY --chown=mcp:mcp src/ ./src/
 # any outbound network call. Override SHLINK_OPENAPI_URL at runtime to track
 # a live source instead.
 COPY --from=spec --chown=mcp:mcp /spec/shlink.json /app/openapi/shlink.json
+
+# Operator-defined extensions catalogue — config-driven prompts, resource
+# templates, and bulk-export tasks layered on top of the OpenAPI tool surface.
+# Default path is file:///app/extensions/extensions.json; override via
+# EXTENSIONS_CONFIG_PATH at runtime (e.g. to mount a per-tenant catalogue).
+COPY --chown=mcp:mcp extensions/ /app/extensions/
 
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \

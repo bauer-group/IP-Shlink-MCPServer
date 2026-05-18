@@ -18,6 +18,7 @@ import structlog
 
 from auth.provider_factory import build_auth_provider
 from config import AuthMode, Settings, get_settings
+from extensions import load_extensions
 from logging_setup import print_banner, setup_logging, warn_no_auth
 from shlink.client import build_shlink_client_from_settings
 from shlink.openapi_loader import SpecCache
@@ -105,6 +106,16 @@ async def build_app(settings: Settings | None = None) -> "FastMCP":
         http_client=shlink_client.httpx_client,
         auth=auth_provider,
         lifespan=lifespan,
+    )
+
+    # Layer operator-defined prompts / resource templates / export tasks on
+    # top of the spec-derived tool surface. A missing config is skipped
+    # silently unless EXTENSIONS_REQUIRED=true.
+    load_extensions(
+        mcp,
+        config_source=settings.extensions_config_path,
+        http_client=shlink_client.httpx_client,
+        required=settings.extensions_required,
     )
 
     _register_healthz_route(mcp)

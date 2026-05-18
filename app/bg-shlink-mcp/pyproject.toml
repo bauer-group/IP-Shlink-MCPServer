@@ -30,7 +30,9 @@ dependencies = [
     # the Entra / Google / OAuthProxy providers we depend on. 3.x replaced
     # authlib.jose with joserfc and moved the OpenAPI provider to
     # fastmcp.server.providers.openapi (handled in shlink/tool_mapper.py).
-    "fastmcp>=3.0.0,<4.0.0",
+    # The [tasks] extra pulls in docket for the long-running task execution
+    # mode — used by extensions/tasks.py for bulk exports.
+    "fastmcp[tasks]>=3.0.0,<4.0.0",
 
     # Async HTTP — used by FastMCP internally and by our Shlink client wrapper.
     "httpx>=0.28.1,<1.0.0",

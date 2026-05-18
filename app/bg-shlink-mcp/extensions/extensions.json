@@ -1,0 +1,161 @@
+{
+  "prompts": [
+    {
+      "name": "top_visits_report",
+      "title": "Top Visits Report",
+      "description": "Generate a ranked report of short URLs by visit count, sorted descending. Combines list_short_urls and get_short_url_visits into one ready-to-render analysis.",
+      "tags": ["analytics", "report"],
+      "arguments": [
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "How many top short URLs to include in the ranking.",
+          "default": 20
+        },
+        {
+          "name": "days",
+          "type": "integer",
+          "description": "Look-back window in days. Visits older than this are ignored.",
+          "default": 30
+        },
+        {
+          "name": "exclude_bots",
+          "type": "boolean",
+          "description": "If true, bot visits are filtered out before ranking.",
+          "default": true
+        }
+      ],
+      "template": "Produce a ranked report of the top ${limit} short URLs by visit count over the last ${days} days.\n\nSteps:\n\n1. Use `list_short_urls` with `itemsPerPage` set high (e.g. 200) and page through every page until you have the complete inventory. Do NOT stop after the first page.\n2. For each short URL, call `get_short_url_visits` with `startDate` set to ${days} days before today and `excludeBots=${exclude_bots}`. Record the total visit count.\n3. Sort the inventory by visit count **descending** and keep the top ${limit}.\n4. Render the result as a markdown table:\n\n   | Rank | Short URL | Long URL | Visits (${days}d) | Tags |\n   |------|-----------|----------|-------------------|------|\n\n5. Below the table add a 2-3 sentence summary covering:\n   - Total visits across the top ${limit}\n   - The single biggest gainer vs. previous comparable window (if `get_visits_summary` data is available)\n   - Any short URL whose visit count is **zero** — those are candidates for review\n\nIf the inventory has fewer than ${limit} short URLs, just report all of them.\n"
+    }
+  ],
+
+  "resources": [
+    {
+      "uri": "shlink://tags",
+      "name": "All Tags",
+      "description": "Flat list of every tag configured on this Shlink instance — useful as context when filtering short URLs by tag.",
+      "mime_type": "application/json",
+      "tags": ["catalogue"],
+      "backend": {
+        "method": "GET",
+        "path": "/tags"
+      }
+    },
+    {
+      "uri": "shlink://tags/stats",
+      "name": "Tag Statistics",
+      "description": "Per-tag short-URL count and visit count. Materialised view of `list_tags + get_tag_visits` for the catalogue.",
+      "mime_type": "application/json",
+      "tags": ["catalogue", "analytics"],
+      "backend": {
+        "method": "GET",
+        "path": "/tags/stats"
+      }
+    },
+    {
+      "uri": "shlink://domains",
+      "name": "All Domains",
+      "description": "List of every configured domain on this Shlink instance, including redirect overrides.",
+      "mime_type": "application/json",
+      "tags": ["catalogue"],
+      "backend": {
+        "method": "GET",
+        "path": "/domains"
+      }
+    },
+    {
+      "uri": "shlink://visits/summary",
+      "name": "Visits Summary",
+      "description": "Aggregate visit counts across the whole instance — overview metric, not per-URL.",
+      "mime_type": "application/json",
+      "tags": ["analytics"],
+      "backend": {
+        "method": "GET",
+        "path": "/visits"
+      }
+    },
+    {
+      "uri": "shlink://visits/orphan",
+      "name": "Orphan Visits",
+      "description": "Visits that did not match any active short URL (404s, expired slugs, typos).",
+      "mime_type": "application/json",
+      "tags": ["analytics"],
+      "backend": {
+        "method": "GET",
+        "path": "/visits/orphan"
+      }
+    },
+    {
+      "uri": "shlink://short-url/{shortCode}",
+      "name": "Short URL Details",
+      "description": "Full metadata for one short URL — long URL, tags, validity window, max-visits cap, hit count.",
+      "mime_type": "application/json",
+      "tags": ["catalogue"],
+      "backend": {
+        "method": "GET",
+        "path": "/short-urls/{shortCode}"
+      }
+    },
+    {
+      "uri": "shlink://short-url/{shortCode}/visits",
+      "name": "Short URL Visits",
+      "description": "Paginated visit log for a single short URL — IP, user agent, referer, geolocation per visit.",
+      "mime_type": "application/json",
+      "tags": ["analytics"],
+      "backend": {
+        "method": "GET",
+        "path": "/short-urls/{shortCode}/visits"
+      }
+    },
+    {
+      "uri": "shlink://short-url/{shortCode}/redirect-rules",
+      "name": "Short URL Redirect Rules",
+      "description": "Per-short-URL conditional redirect rules (device, language, geo) — read-only here; mutate via the `set_redirect_rules` tool.",
+      "mime_type": "application/json",
+      "tags": ["catalogue"],
+      "backend": {
+        "method": "GET",
+        "path": "/short-urls/{shortCode}/redirect-rules"
+      }
+    },
+    {
+      "uri": "shlink://tag/{tag}/visits",
+      "name": "Tag Visits",
+      "description": "Aggregated visits for every short URL tagged with the given tag.",
+      "mime_type": "application/json",
+      "tags": ["analytics"],
+      "backend": {
+        "method": "GET",
+        "path": "/tags/{tag}/visits"
+      }
+    },
+    {
+      "uri": "shlink://domain/{domain}/visits",
+      "name": "Domain Visits",
+      "description": "Aggregated visits for every short URL on the given domain.",
+      "mime_type": "application/json",
+      "tags": ["analytics"],
+      "backend": {
+        "method": "GET",
+        "path": "/domains/{domain}/visits"
+      }
+    }
+  ],
+
+  "tasks": [
+    {
+      "name": "export_short_urls",
+      "title": "Export Short URLs",
+      "description": "Bulk-export every short URL on this Shlink instance as CSV or JSON. Pages through the entire inventory; large instances may take a few seconds.",
+      "tags": ["export", "bulk"],
+      "exporter": "short_urls",
+      "formats": ["csv", "json"],
+      "page_size": 200,
+      "task": {
+        "mode": "optional",
+        "poll_interval_seconds": 2.0,
+        "ttl_seconds": 900
+      }
+    }
+  ]
+}

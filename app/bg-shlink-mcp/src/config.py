@@ -100,6 +100,25 @@ class Settings(BaseSettings):
         description="Per-request timeout for outbound calls to Shlink",
     )
 
+    # ── Extensions catalogue ───────────────────────────────────────────────
+    extensions_config_path: str = Field(
+        default="file:///app/extensions/extensions.json",
+        description=(
+            "Path to the operator-defined extensions catalogue (prompts, "
+            "resource templates, export tasks). `file://` or bare path; "
+            "remote URLs are intentionally not supported. Missing files are "
+            "logged and skipped — set EXTENSIONS_REQUIRED=true to fail fast."
+        ),
+    )
+    extensions_required: bool = Field(
+        default=False,
+        description=(
+            "If true, the server refuses to start when the extensions config "
+            "is missing. Leave false for backwards-compatibility with images "
+            "built before the extensions layer existed."
+        ),
+    )
+
     # ── MCP transport ──────────────────────────────────────────────────────
     mcp_transport: Literal["streamable-http", "stdio"] = "streamable-http"
     mcp_host: str = "0.0.0.0"
