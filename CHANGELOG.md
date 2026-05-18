@@ -1,3 +1,9 @@
+## [0.10.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.0...v0.10.1) (2026-05-18)
+
+### 🐛 Bug Fixes
+
+* **docker:** honored MCP_PORT runtime override end-to-end ([65a63db](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/65a63dbc96edce5bfc1f608cc1f532fb15a44d14))
+
 ## [0.10.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.9.0...v0.10.0) (2026-05-18)
 
 ### 🚀 Features
