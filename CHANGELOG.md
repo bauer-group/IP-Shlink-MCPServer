@@ -1,3 +1,9 @@
+## [0.11.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.11.1...v0.11.2) (2026-05-18)
+
+### 🐛 Bug Fixes
+
+* **network:** reverted default bind to 0.0.0.0 (Coolify bridge is v4-only) ([578241f](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/578241fe822a36cecf3b7207952afae119170a67))
+
 ## [0.11.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.11.0...v0.11.1) (2026-05-18)
 
 ### 🐛 Bug Fixes
