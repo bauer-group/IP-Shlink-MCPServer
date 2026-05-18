@@ -153,7 +153,7 @@ def run_http(
         *(["--network", network] if network else []),
         *env_flags(env),
         "-e", "MCP_TRANSPORT=streamable-http",
-        "-e", "MCP_HOST=0.0.0.0",
+        "-e", "MCP_HOST=::",
         "-e", "MCP_PORT=8000",
         "-e", f"PUBLIC_BASE_URL=http://localhost:{port}",
         image,

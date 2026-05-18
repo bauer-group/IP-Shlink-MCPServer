@@ -121,7 +121,10 @@ class Settings(BaseSettings):
 
     # ── MCP transport ──────────────────────────────────────────────────────
     mcp_transport: Literal["streamable-http", "stdio"] = "streamable-http"
-    mcp_host: str = "0.0.0.0"
+    # Dual-stack bind: "::" with Linux's default bindv6only=0 accepts native
+    # IPv6 AND v4-mapped IPv4 connections via a single socket. Use "0.0.0.0"
+    # to opt out (IPv4-only) or "::1"/"127.0.0.1" to restrict to loopback.
+    mcp_host: str = "::"
     mcp_port: int = Field(default=8000, ge=1, le=65535)
 
     # ── MCP server identity (consent screen branding) ──────────────────────
