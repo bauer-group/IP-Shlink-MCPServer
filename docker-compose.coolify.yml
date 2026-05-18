@@ -50,6 +50,10 @@ x-logging: &logging
 services:
   shlink-mcp:
     image: ${SHLINK_MCP_IMAGE:-ghcr.io/bauer-group/ip-shlink-mcpserver/bg-shlink-mcp}:${SHLINK_MCP_VERSION:-latest}
+    # Force a registry roundtrip on every redeploy so moving tags like :latest
+    # / :stable / :0.12 actually refresh — Compose's default `missing` policy
+    # otherwise reuses the locally cached image indefinitely once it exists.
+    pull_policy: always
     restart: unless-stopped
     <<: *logging
 
