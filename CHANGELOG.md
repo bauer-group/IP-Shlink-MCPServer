@@ -1,3 +1,9 @@
+## [0.7.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.4...v0.7.0) (2026-05-18)
+
+### 🚀 Features
+
+* **auth:** branded OAuth consent screen and corrected callback paths ([c7696fe](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/c7696fec25b3091062e4a05922505e61d521a331))
+
 ## [0.6.4](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.3...v0.6.4) (2026-05-18)
 
 ### ♻️ Refactoring
