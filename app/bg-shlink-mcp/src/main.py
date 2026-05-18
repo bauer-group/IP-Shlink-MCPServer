@@ -13,9 +13,31 @@ typer handles arg parsing and help screens.
 from __future__ import annotations
 
 import asyncio
+import socket as _socket
 import sys
 from pathlib import Path
 from typing import Optional
+
+# Force dual-stack on every IPv6 server socket this process creates.
+# Python's asyncio (used by uvicorn) hardcodes IPV6_V6ONLY=1 in
+# base_events.BaseEventLoop.create_server, making "::" v6-only — which
+# breaks behind v4-only bridges (e.g. Coolify). Subclassing socket.socket
+# and silently coercing IPV6_V6ONLY back to 0 is the smallest fix.
+_orig_socket = _socket.socket
+
+
+class _DualStackSocket(_orig_socket):  # type: ignore[misc, valid-type]
+    def setsockopt(self, level, optname, value):  # type: ignore[override]
+        if (
+            level == _socket.IPPROTO_IPV6
+            and optname == _socket.IPV6_V6ONLY
+            and value
+        ):
+            value = 0
+        return super().setsockopt(level, optname, value)
+
+
+_socket.socket = _DualStackSocket  # type: ignore[misc]
 
 # Allow `python src/main.py` to resolve the package even without an install.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
