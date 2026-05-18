@@ -161,6 +161,19 @@ class Settings(BaseSettings):
     )
     auth_redis_url: str | None = None
     auth_storage_encryption_key: SecretStr | None = None
+    # When AUTH_REDIS_URL is empty, OAuth state (DCR clients, refresh tokens,
+    # auth codes, JTI mappings) is persisted to this directory as an encrypted
+    # DiskStore. Encryption key is derived from AUTH_JWT_SIGNING_KEY via HKDF —
+    # no separate Fernet key required for the disk path. Operators MUST mount
+    # this path as a volume in containerised deployments, otherwise the data
+    # disappears on restart (which is the bug operators historically hit).
+    auth_disk_storage_path: str = Field(
+        default="/app/data/oauth-storage",
+        description=(
+            "Filesystem path for the encrypted OAuth state store when "
+            "AUTH_REDIS_URL is unset. Mount as a Docker volume in production."
+        ),
+    )
 
     # Entra ID (single + multi)
     entra_client_id: str | None = None
@@ -339,6 +352,10 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "AUTH_STORAGE_ENCRYPTION_KEY is required when AUTH_REDIS_URL is set"
                 )
+            # Validate Fernet format here — a malformed key would otherwise fail
+            # silently at first OAuth login (deep in FastMCP), making the cause
+            # invisible. Fail at boot instead.
+            _validate_fernet_key(self.auth_storage_encryption_key.get_secret_value())
 
         return self
 
@@ -363,6 +380,26 @@ def _has_value(value: object) -> bool:
     if isinstance(value, str):
         return bool(value.strip())
     return bool(value)
+
+
+def _validate_fernet_key(raw: str) -> None:
+    """Ensure AUTH_STORAGE_ENCRYPTION_KEY parses as a Fernet key.
+
+    Fernet expects 32 url-safe base64-encoded bytes (44 chars including the
+    `=` padding). Operators occasionally paste a hex string or a raw 32-byte
+    blob — both are rejected here so the boot fails loudly instead of
+    surfacing as an InvalidToken deep inside FastMCP on the first login.
+    """
+    from cryptography.fernet import Fernet
+
+    try:
+        Fernet(raw.encode("ascii"))
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            "AUTH_STORAGE_ENCRYPTION_KEY is not a valid Fernet key. "
+            "Generate one with: python -c \"from cryptography.fernet import "
+            "Fernet; print(Fernet.generate_key().decode())\""
+        ) from exc
 
 
 _settings: Settings | None = None

@@ -50,12 +50,17 @@ def discover_endpoints(discovery_url: str, *, timeout: float = 10.0) -> dict[str
 
 
 def build_generic_oidc_provider(settings: Settings) -> Any:
+    from .client_storage import build_client_storage
+
     if not settings.oidc_client_id or not settings.oidc_client_secret:
         raise ValueError("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are required")
 
     scopes = settings.oidc_scopes.split()
     base_url = str(settings.public_base_url)
     signing_key = settings.auth_jwt_signing_key.get_secret_value() or None
+    # Persistent encrypted storage — without this FastMCP falls back to
+    # platformdirs which is ephemeral inside containers. See client_storage.py.
+    client_storage = build_client_storage(settings)
 
     if settings.oidc_discovery_url:
         # Validate the discovery doc up-front so a misconfigured URL fails at
@@ -73,6 +78,7 @@ def build_generic_oidc_provider(settings: Settings) -> Any:
             "client_secret": settings.oidc_client_secret.get_secret_value(),
             "base_url": base_url,
             "required_scopes": scopes,
+            "client_storage": client_storage,
         }
         if settings.oidc_issuer:
             kwargs["issuer_url"] = settings.oidc_issuer
@@ -115,6 +121,7 @@ def build_generic_oidc_provider(settings: Settings) -> Any:
         "token_verifier": token_verifier,
         "base_url": base_url,
         "valid_scopes": scopes,
+        "client_storage": client_storage,
     }
     if signing_key:
         kwargs["jwt_signing_key"] = signing_key

@@ -64,6 +64,7 @@ services:
       AUTH_JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY:?AUTH_JWT_SIGNING_KEY is required}
       AUTH_REDIS_URL: ${AUTH_REDIS_URL:-redis://redis:6379/0}
       AUTH_STORAGE_ENCRYPTION_KEY: ${AUTH_STORAGE_ENCRYPTION_KEY:?AUTH_STORAGE_ENCRYPTION_KEY is required}
+      AUTH_DISK_STORAGE_PATH: ${AUTH_DISK_STORAGE_PATH:-/app/data/oauth-storage}
 
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
       ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
@@ -107,6 +108,12 @@ services:
     networks:
       - proxy
       - local
+
+    # Persistent OAuth state for the disk-storage fallback (when AUTH_REDIS_URL
+    # is empty). Defense in depth — even if the operator runs Redis-backed
+    # storage today and disables it later, OAuth state survives the switch.
+    volumes:
+      - oauth-data:/app/data/oauth-storage
 
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:${MCP_PORT:-8000}/healthz"]
@@ -172,6 +179,9 @@ volumes:
   redis-data:
     driver: local
     name: ${STACK_NAME:-bg-shlink-mcp}-redis
+  oauth-data:
+    driver: local
+    name: ${STACK_NAME:-bg-shlink-mcp}-oauth
 
 
 networks:

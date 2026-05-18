@@ -74,6 +74,8 @@ def build_entra_provider(settings: Settings) -> Any:
             hint="set ENTRA_TENANT_ID=organizations or common for true multi-tenant",
         )
 
+    from .client_storage import build_client_storage
+
     provider = AzureProvider(
         client_id=settings.entra_client_id,
         client_secret=settings.entra_client_secret.get_secret_value(),
@@ -81,6 +83,11 @@ def build_entra_provider(settings: Settings) -> Any:
         base_url=str(settings.public_base_url),
         required_scopes=api_scopes,
         additional_authorize_scopes=additional_authorize_scopes,
+        # Persistent encrypted storage — without this FastMCP falls back to
+        # platformdirs which is ephemeral inside containers, causing all
+        # OAuth state to vanish on restart. See auth/client_storage.py.
+        client_storage=build_client_storage(settings),
+        jwt_signing_key=settings.auth_jwt_signing_key.get_secret_value(),
     )
 
     logger.info(

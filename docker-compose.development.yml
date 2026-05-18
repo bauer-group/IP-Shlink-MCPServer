@@ -61,6 +61,7 @@ services:
       AUTH_JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY:-dev-only-do-not-use-in-production-deadbeef00000000000000000000000000}
       AUTH_REDIS_URL: ${AUTH_REDIS_URL:-}
       AUTH_STORAGE_ENCRYPTION_KEY: ${AUTH_STORAGE_ENCRYPTION_KEY:-}
+      AUTH_DISK_STORAGE_PATH: ${AUTH_DISK_STORAGE_PATH:-/app/data/oauth-storage}
 
       ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
       ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
@@ -107,6 +108,12 @@ services:
 
     networks:
       - local
+
+    # Persistent OAuth state for the disk-storage fallback (when AUTH_REDIS_URL
+    # is empty). Without this volume mount, every container restart wipes
+    # DCR client registrations + refresh tokens → users have to re-authenticate.
+    volumes:
+      - oauth-data:/app/data/oauth-storage
 
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:${MCP_PORT:-8000}/healthz"]
@@ -175,6 +182,9 @@ volumes:
   redis-data:
     driver: local
     name: ${STACK_NAME:-bg-shlink-mcp}-redis
+  oauth-data:
+    driver: local
+    name: ${STACK_NAME:-bg-shlink-mcp}-oauth
 
 
 networks:

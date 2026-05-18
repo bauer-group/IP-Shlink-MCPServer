@@ -137,6 +137,13 @@ COPY --from=spec --chown=mcp:mcp /spec/shlink.json /app/openapi/shlink.json
 # EXTENSIONS_CONFIG_PATH at runtime (e.g. to mount a per-tenant catalogue).
 COPY --chown=mcp:mcp extensions/ /app/extensions/
 
+# OAuth state directory for the disk-storage fallback (when AUTH_REDIS_URL is
+# unset). Created and chowned at build time so the mcp user can write to it
+# even before a volume is mounted. Compose stacks mount this path as a named
+# volume; bare `docker run` invocations get a working but ephemeral default.
+RUN mkdir -p /app/data/oauth-storage \
+    && chown -R mcp:mcp /app/data
+
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
