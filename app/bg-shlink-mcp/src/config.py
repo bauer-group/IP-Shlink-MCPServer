@@ -121,10 +121,9 @@ class Settings(BaseSettings):
 
     # ── MCP transport ──────────────────────────────────────────────────────
     mcp_transport: Literal["streamable-http", "stdio"] = "streamable-http"
-    # Dual-stack default. main.py installs a socket monkey-patch that
-    # clears IPV6_V6ONLY (asyncio sets it to 1), so "::" accepts both
-    # IPv6 and v4-mapped IPv4 connections via one listener.
-    mcp_host: str = "::"
+    # Empty = bind to any stack, any interface (dual-stack via main.py
+    # patch). Set explicitly to pin: "0.0.0.0", "::", "127.0.0.1", "::1".
+    mcp_host: str = ""
     mcp_port: int = Field(default=8000, ge=1, le=65535)
 
     # ── MCP server identity (consent screen branding) ──────────────────────

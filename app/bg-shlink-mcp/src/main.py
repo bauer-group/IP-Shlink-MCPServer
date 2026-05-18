@@ -18,21 +18,14 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Force dual-stack on every IPv6 server socket this process creates.
-# Python's asyncio (used by uvicorn) hardcodes IPV6_V6ONLY=1 in
-# base_events.BaseEventLoop.create_server, making "::" v6-only — which
-# breaks behind v4-only bridges (e.g. Coolify). Subclassing socket.socket
-# and silently coercing IPV6_V6ONLY back to 0 is the smallest fix.
 _orig_socket = _socket.socket
 
 
 class _DualStackSocket(_orig_socket):  # type: ignore[misc, valid-type]
+    # asyncio hardcodes IPV6_V6ONLY=1 on v6 server sockets; coerce back to 0
+    # so a "::" bind accepts both IPv6 and v4-mapped IPv4 in one listener.
     def setsockopt(self, level, optname, value):  # type: ignore[override]
-        if (
-            level == _socket.IPPROTO_IPV6
-            and optname == _socket.IPV6_V6ONLY
-            and value
-        ):
+        if level == _socket.IPPROTO_IPV6 and optname == _socket.IPV6_V6ONLY and value:
             value = 0
         return super().setsockopt(level, optname, value)
 
@@ -88,7 +81,7 @@ def serve(
     from server import build_app
 
     settings = get_settings()
-    if host:
+    if host is not None:
         settings.mcp_host = host
     if port:
         settings.mcp_port = port
@@ -102,11 +95,14 @@ async def _serve_async(settings: Settings, transport: str) -> None:
     from server import build_app
 
     mcp = await build_app(settings)
+    # Empty MCP_HOST means "any stack, any interface" — bind "::" so the
+    # dual-stack monkey-patch above produces a v6+v4 listener.
+    bind_host = settings.mcp_host or "::"
     logger = structlog.stdlib.get_logger("bg-shlink-mcp.main")
     logger.info(
         "server.starting",
         transport=transport,
-        host=settings.mcp_host,
+        host=bind_host,
         port=settings.mcp_port,
     )
 
@@ -114,7 +110,7 @@ async def _serve_async(settings: Settings, transport: str) -> None:
         await mcp.run_stdio_async()
     elif transport == "streamable-http":
         await mcp.run_http_async(
-            host=settings.mcp_host,
+            host=bind_host,
             port=settings.mcp_port,
             transport="streamable-http",
         )
