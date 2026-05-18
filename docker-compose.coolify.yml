@@ -6,11 +6,28 @@
 #   * the `coolify.managed`, `coolify.applicationId`, `coolify.type` labels
 #   * Traefik routing via the SERVICE_FQDN_* magic variable + `expose:` port
 #   * SSL provisioning (Let's Encrypt / custom cert via the Coolify UI)
+#   * a per-resource UUID-named bridge network — Coolify attaches both
+#     Traefik AND all services to it, service-name DNS works out of the box
 #
-# We declare an explicit `local` bridge network instead of relying on
-# Coolify's auto-generated one — gives the stack a predictable network
-# name and isolates the shlink-mcp ↔ redis traffic from anything else
-# Coolify might attach to the project network.
+# Important — the previously declared custom `networks: local` block is now
+# COMMENTED OUT (search for "DISABLED:" below). Reason: services on Coolify
+# attach to TWO networks when you add a custom one — Coolify's UUID-named
+# resource network AND your custom one. Traefik only sits on the UUID one,
+# and without an explicit `traefik.docker.network=<uuid>` label it picks
+# non-deterministically — manifests as intermittent or persistent 504
+# Gateway Timeout. The label can't be encoded portably because the UUID is
+# deployment-specific (Coolify discussions #1815, #5686). Letting Coolify
+# own the network removes the problem entirely; service-name DNS between
+# shlink-mcp ↔ redis still works because they share the auto-network.
+#
+# Two paths if you want the custom-network back (NOT recommended):
+#   a) Operator sets COOLIFY_NETWORK_NAME=<your-resource-uuid> in the
+#      Coolify env panel + uncomments the labels stub on the shlink-mcp
+#      service further down. Find the UUID via:
+#         docker network ls --filter "label=coolify.applicationId"
+#      or read it from the Coolify UI URL (last segment of /application/...).
+#   b) Hardcode the UUID directly in the labels — breaks on every redeploy
+#      that allocates a new resource UUID; only viable for static fleets.
 #
 # Operator workflow (Coolify UI):
 #   1. Set the domain in the application's "Domains" field
@@ -105,8 +122,19 @@ services:
       redis:
         condition: service_healthy
 
-    networks:
-      - local
+    # DISABLED: see top-of-file comment. Coolify auto-attaches services to
+    # its UUID-named resource network; adding a second custom network is
+    # what caused 504 Gateway Timeout (Traefik routed via the wrong bridge).
+    # networks:
+    #   - local
+
+    # OPTIONAL — only uncomment if you NEED the custom `local` network
+    # back AND have set COOLIFY_NETWORK_NAME=<your-resource-uuid> in the
+    # Coolify env panel. The labels pin Traefik to the right bridge and
+    # to the right upstream port, removing the routing ambiguity.
+    # labels:
+    #   - "traefik.docker.network=${COOLIFY_NETWORK_NAME:?set COOLIFY_NETWORK_NAME to your Coolify resource UUID, e.g. s5qiyy0f8gwsgblp3ojxp224}"
+    #   - "traefik.http.services.shlink-mcp.loadbalancer.server.port=${MCP_PORT:-8000}"
 
     # Persistent OAuth state for the disk-storage fallback (when AUTH_REDIS_URL
     # is empty). Defense in depth — even if the operator runs Redis-backed
@@ -142,8 +170,10 @@ services:
       - 6379
     volumes:
       - redis-data:/data
-    networks:
-      - local
+    # DISABLED: see top-of-file comment. Redis stays on Coolify's auto-network;
+    # `shlink-mcp` finds it via service-name DNS as `redis:6379`.
+    # networks:
+    #   - local
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -160,8 +190,15 @@ volumes:
     name: bg-shlink-mcp-oauth
 
 
-networks:
-  local:
-    driver: bridge
-    name: bg-shlink-mcp
-    enable_ipv6: true
+# DISABLED: custom networks force a Traefik routing ambiguity on Coolify —
+# see top-of-file comment for the full explanation. Coolify auto-creates a
+# UUID-named bridge network per resource (e.g. s5qiyy0f8gwsgblp3ojxp224) and
+# attaches Traefik to it. Re-enabling this block requires the labels stub on
+# the shlink-mcp service to be uncommented AND COOLIFY_NETWORK_NAME set in
+# the operator env panel — otherwise 504s come back.
+#
+# networks:
+#   local:
+#     driver: bridge
+#     name: bg-shlink-mcp
+#     enable_ipv6: true
