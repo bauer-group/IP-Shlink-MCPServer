@@ -87,34 +87,22 @@ async def _handle_disallowed_tenant(
     call_next: CallNext[Any, Any],
     token_claims: dict[str, Any],
 ) -> Any:
-    """Decide what happens when a token's tid is NOT on the allowlist.
+    """Reject (default) or log-and-pass (audit-only) on tenant-allowlist miss.
 
-    TODO (you): implement the rejection policy. Trade-offs to consider:
-
-    1. Hard reject vs. audit-only
-       - `audit_only=True` should log and pass through (`return await call_next(context)`).
-         Useful during staged rollouts: you can wire the middleware in, watch the logs
-         for who would have been denied, THEN flip to enforcement.
-       - `audit_only=False` should reject (`raise TenantNotAllowedError(...)`).
-         This is the production posture.
-
-    2. What goes in the log payload?
-       The `tid` is the bare minimum. Useful additions: `sub` (which user),
-       `azp` (which client app), `context.method` (what they tried to do).
-       Avoid logging the entire `token_claims` — it may contain email/upn
-       and other PII that BG security standards prefer kept out of logs.
-
-    3. Log level
-       Audit-only path: `logger.warning` (operator wants to see these but
-       they're not yet incidents). Enforcement path: `logger.warning` for
-       expected churn / `logger.error` for "this should never happen" —
-       your call based on threat model.
-
-    Expected length: 5-10 lines. Reference: structlog calls already use
-    kwargs (e.g. `logger.warning("event.name", tid=tid, allowed=allowed_tenants)`).
+    Log payload omits full claims to keep PII (email/upn/name) out of logs —
+    only the tid + sub + the MCP method being attempted are recorded. That's
+    enough for a security operator to correlate without storing PII.
     """
-    # TODO: replace this placeholder with your policy.
-    raise NotImplementedError(
-        "Tenant rejection policy not implemented. "
-        "See _handle_disallowed_tenant docstring in auth/middleware.py."
+    log_kwargs = {
+        "tid": tid,
+        "sub": token_claims.get("sub"),
+        "method": context.method,
+        "allowed_tenants": allowed_tenants,
+    }
+    if audit_only:
+        logger.warning("auth.tenant_denied_audit_only_passing_through", **log_kwargs)
+        return await call_next(context)
+    logger.warning("auth.tenant_denied", **log_kwargs)
+    raise TenantNotAllowedError(
+        f"Tenant {tid!r} is not on the allowlist for this MCP server"
     )

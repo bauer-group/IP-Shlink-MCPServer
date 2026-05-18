@@ -71,21 +71,35 @@ async def test_empty_allowlist_passes_everything(monkeypatch):
 # ── Reject / policy-dispatch path ───────────────────────────────────────────
 
 
-async def test_disallowed_tid_invokes_policy(monkeypatch):
-    """A token whose tid is NOT on the list dispatches to the policy hook.
+async def test_disallowed_tid_hard_rejects_by_default(monkeypatch):
+    """Default policy: raise TenantNotAllowedError, deny the operation."""
+    monkeypatch.setattr(
+        mw_module,
+        "get_access_token",
+        lambda: _StubToken(claims={"tid": "tenant-evil", "sub": "u1"}),
+    )
+    middleware = TenantAllowlistMiddleware(allowed_tenants=["tenant-a"])
+    with pytest.raises(TenantNotAllowedError, match="tenant-evil"):
+        await middleware.on_request(_StubContext(), _passthrough)
 
-    Until the user implements _handle_disallowed_tenant, the default raises
-    NotImplementedError. Once implemented, change this assertion to match
-    your chosen behaviour (raise TenantNotAllowedError / audit-log + pass).
+
+async def test_disallowed_tid_audit_only_passes_through(monkeypatch):
+    """audit_only=True: log the denial but let the request through.
+
+    Useful during staged rollouts — wire the middleware in, watch logs for
+    who would have been denied, then flip audit_only=False once confident.
     """
     monkeypatch.setattr(
         mw_module,
         "get_access_token",
-        lambda: _StubToken(claims={"tid": "tenant-evil"}),
+        lambda: _StubToken(claims={"tid": "tenant-evil", "sub": "u1"}),
     )
-    middleware = TenantAllowlistMiddleware(allowed_tenants=["tenant-a"])
-    with pytest.raises(NotImplementedError):
-        await middleware.on_request(_StubContext(), _passthrough)
+    middleware = TenantAllowlistMiddleware(
+        allowed_tenants=["tenant-a"],
+        audit_only=True,
+    )
+    result = await middleware.on_request(_StubContext(), _passthrough)
+    assert result == "ok"
 
 
 async def test_missing_tid_claim_is_disallowed(monkeypatch):
@@ -96,7 +110,7 @@ async def test_missing_tid_claim_is_disallowed(monkeypatch):
         lambda: _StubToken(claims={"sub": "u1"}),  # no tid
     )
     middleware = TenantAllowlistMiddleware(allowed_tenants=["tenant-a"])
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(TenantNotAllowedError):
         await middleware.on_request(_StubContext(), _passthrough)
 
 
