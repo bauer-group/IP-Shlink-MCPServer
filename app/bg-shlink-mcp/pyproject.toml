@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bg-shlink-mcp"
-version = "0.10.1"
+version = "0.10.2"
 description = "BAUER GROUP Shlink MCP Server — OIDC-gated remote MCP bridge for self-hosted Shlink"
 readme = "README.md"
 license = { text = "MIT" }

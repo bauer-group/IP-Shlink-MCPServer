@@ -1,3 +1,9 @@
+## [0.10.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.1...v0.10.2) (2026-05-18)
+
+### 🐛 Bug Fixes
+
+* **auth:** wired persistent encrypted OAuth state storage across all providers ([b611583](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/b6115836429019251cec74514dd1609dd612ea1f))
+
 ## [0.10.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.0...v0.10.1) (2026-05-18)
 
 ### 🐛 Bug Fixes
