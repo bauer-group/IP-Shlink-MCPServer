@@ -1,3 +1,9 @@
+## [0.11.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.11.0...v0.11.1) (2026-05-18)
+
+### 🐛 Bug Fixes
+
+* **coolify:** disabled custom network to resolve Traefik 504 timeout ([cbb9385](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/cbb93858617c309989dd9ec37abc5c2879bb7f42)), closes [#1815](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/1815) [#5686](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/5686)
+
 ## [0.11.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.3...v0.11.0) (2026-05-18)
 
 ### 🚀 Features
