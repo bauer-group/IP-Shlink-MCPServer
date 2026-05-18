@@ -16,6 +16,7 @@ import inspect
 import re
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -78,11 +79,14 @@ def _build_resource_function(
     backend_path = cfg.backend.path
 
     async def _runner(**kwargs: str) -> Any:
-        # Substitute path placeholders. Values are URL-encoded by httpx
-        # when it builds the request, so we just do plain string format.
+        # Percent-encode placeholder values before substitution. httpx does
+        # NOT re-encode interpolated path strings — it only encodes `params=`
+        # and headers. Without quote(safe=""), a client passing
+        # `shortCode="abc/visits"` would address a different Shlink endpoint
+        # than the one this resource template advertises.
         path = backend_path
         for name, value in kwargs.items():
-            path = path.replace(f"{{{name}}}", str(value))
+            path = path.replace(f"{{{name}}}", quote(str(value), safe=""))
         response = await http_client.request(method, path)
         response.raise_for_status()
         # Resources may return JSON / text / bytes — FastMCP figures out

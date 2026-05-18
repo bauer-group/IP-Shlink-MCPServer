@@ -229,6 +229,34 @@ async def test_built_resource_function_substitutes_path_placeholders():
     assert "/short-urls/abc" in captured["url"]
 
 
+async def test_built_resource_function_url_encodes_placeholder_values():
+    """A `{shortCode}` value containing `/`, `?`, or `#` must NOT escape its segment.
+
+    Without percent-encoding, `shortCode="abc/visits"` would land on the
+    visits endpoint — a different Shlink operation than the resource
+    template advertises (potential authz-hint bypass for the LLM client).
+    """
+    captured: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={})
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://shlink/rest/v3",
+    )
+    cfg = ResourceConfig.model_validate({
+        "uri": "shlink://short-url/{shortCode}",
+        "name": "x",
+        "backend": {"method": "GET", "path": "/short-urls/{shortCode}"},
+    })
+    fn = _build_resource_function(cfg, client)
+    await fn(shortCode="abc/visits?x=1")
+    # Slash and question-mark are percent-encoded, so the segment stays one path component.
+    assert "/short-urls/abc%2Fvisits%3Fx%3D1" in captured["url"]
+
+
 # ── Tasks: exporter classes ─────────────────────────────────────────────────
 
 
