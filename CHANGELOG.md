@@ -1,3 +1,9 @@
+## [0.10.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.9.0...v0.10.0) (2026-05-18)
+
+### 🚀 Features
+
+* **security:** wired token-bucket rate limiter with proxy-aware client keying ([6f3f767](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/6f3f7674cc169efc810384a9a36551c2d3cf6536))
+
 ## [0.9.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.8.0...v0.9.0) (2026-05-18)
 
 ### 🚀 Features
