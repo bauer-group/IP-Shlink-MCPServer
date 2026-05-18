@@ -204,9 +204,44 @@ class Settings(BaseSettings):
     oidc_username_claim: str = "preferred_username"
 
     # ── Rate limiting ──────────────────────────────────────────────────────
+    # Token-bucket limiter (FastMCP's RateLimitingMiddleware). Defaults express
+    # the previous "600 req / 60s" budget as the equivalent token-bucket shape:
+    # 10 req/s sustained, 20 req burst.
     rate_limiter_enabled: bool = True
-    rate_limiter_requests: int = Field(default=600, ge=1)
-    rate_limiter_window_seconds: int = Field(default=60, ge=1)
+    rate_limiter_max_requests_per_second: float = Field(
+        default=10.0,
+        gt=0.0,
+        description="Sustained throughput per client (tokens refilled per second).",
+    )
+    rate_limiter_burst_capacity: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Maximum burst per client. None ⇒ 2× max_requests_per_second "
+            "(FastMCP default)."
+        ),
+    )
+    rate_limiter_global: bool = Field(
+        default=False,
+        description=(
+            "If true, one bucket for the whole server (DoS shield). "
+            "If false (default), one bucket per client identity."
+        ),
+    )
+    rate_limiter_trusted_proxy_hops: int = Field(
+        default=1,
+        ge=0,
+        le=10,
+        description=(
+            "How many trusted reverse-proxy hops sit in front of this server. "
+            "Used to extract the client IP from X-Forwarded-For: the value at "
+            "position -N (rightmost-N) is what the outermost trusted proxy "
+            "saw. 1 = direct Traefik (default). 2 = Cloudflare → Traefik. "
+            "0 = no proxy; XFF is ignored and request.client.host is used. "
+            "When the request is authenticated, the OAuth subject is preferred "
+            "over IP regardless of this setting."
+        ),
+    )
 
     # ── Observability ──────────────────────────────────────────────────────
     sentry_dsn: str | None = None

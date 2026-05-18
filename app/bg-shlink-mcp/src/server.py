@@ -21,6 +21,7 @@ from auth.provider_factory import build_auth_provider
 from config import AuthMode, Settings, get_settings
 from extensions import load_extensions
 from logging_setup import print_banner, setup_logging, warn_no_auth
+from rate_limit import build_rate_limit_middleware
 from shlink.client import build_shlink_client_from_settings
 from shlink.openapi_loader import SpecCache
 from shlink.tool_mapper import build_mcp_from_spec
@@ -116,6 +117,15 @@ async def build_app(settings: Settings | None = None) -> "FastMCP":
         icon_url=icon_url,
         website_url=website_url,
     )
+
+    # Rate limiter goes on FIRST so it's the cheapest possible rejection
+    # path under load — no token validation, no tenant lookup. Per-client
+    # keying uses the OAuth subject when authenticated (set by the auth
+    # provider before middleware runs) and falls back to the proxy-aware
+    # client IP. See rate_limit.py for the trust model.
+    rate_limit_mw = build_rate_limit_middleware(settings)
+    if rate_limit_mw is not None:
+        mcp.add_middleware(rate_limit_mw)
 
     # Tenant allowlist enforcement for entra-multi. AzureProvider only
     # validates signature + issuer pattern; without this middleware, ANY

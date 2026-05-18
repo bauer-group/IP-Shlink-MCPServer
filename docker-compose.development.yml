@@ -83,8 +83,13 @@ services:
       OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
 
       RATE_LIMITER_ENABLED: ${RATE_LIMITER_ENABLED:-false}
-      RATE_LIMITER_REQUESTS: ${RATE_LIMITER_REQUESTS:-600}
-      RATE_LIMITER_WINDOW_SECONDS: ${RATE_LIMITER_WINDOW_SECONDS:-60}
+      RATE_LIMITER_MAX_REQUESTS_PER_SECOND: ${RATE_LIMITER_MAX_REQUESTS_PER_SECOND:-10}
+      RATE_LIMITER_BURST_CAPACITY: ${RATE_LIMITER_BURST_CAPACITY:-20}
+      RATE_LIMITER_GLOBAL: ${RATE_LIMITER_GLOBAL:-false}
+      # Dev runs without Traefik (direct host:port). 0 = ignore XFF, trust
+      # request.client.host. Set to 1 only when you front the dev stack with
+      # a local proxy.
+      RATE_LIMITER_TRUSTED_PROXY_HOPS: ${RATE_LIMITER_TRUSTED_PROXY_HOPS:-0}
 
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
