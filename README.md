@@ -194,6 +194,7 @@ IP-Shlink-MCPServer/
 - [docs/client-setup.md](docs/client-setup.md) — adding the connector in each AI client
 - [docs/testing.md](docs/testing.md) — local & remote testing with MCP Inspector (GUI + CLI)
 - [docs/tools.md](docs/tools.md) — auto-generated catalogue of MCP tools
+- [docs/mcp-primitives.md](docs/mcp-primitives.md) — implementation guide for all 11 MCP Inspector tabs (Tools, Resources, Prompts, Tasks, Apps, Sampling, Elicitations, Roots, Auth, Metadata, Ping)
 - [docs/troubleshooting.md](docs/troubleshooting.md) — common errors & fixes
 - [docs/SHLINK-MCP-SPEC.md](docs/SHLINK-MCP-SPEC.md) — design specification (source of truth)
 
