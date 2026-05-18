@@ -1,3 +1,17 @@
+## [0.8.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.7.0...v0.8.0) (2026-05-18)
+
+### 🚀 Features
+
+* **auth:** added tenant allowlist middleware for entra-multi ([1874ab2](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/1874ab22e218eade884e6913d8277501e3c14962))
+
+### 🐛 Bug Fixes
+
+* **security:** percent-encoded path placeholders in resource templates ([b603f99](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/b603f99db4ae829319587f3c08a87e20dc156ddf))
+
+### ♻️ Refactoring
+
+* **static:** switched index page to shared /logo.svg asset ([c4bc33d](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/c4bc33d3e0c54b2ee79192508acfd0d6603ad5af))
+
 ## [0.7.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.4...v0.7.0) (2026-05-18)
 
 ### 🚀 Features
