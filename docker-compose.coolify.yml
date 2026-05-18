@@ -61,7 +61,7 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
 
       MCP_TRANSPORT: ${MCP_TRANSPORT:-streamable-http}
-      MCP_HOST: ${MCP_HOST:-::}
+      MCP_HOST: ${MCP_HOST:-0.0.0.0}
       MCP_PORT: ${MCP_PORT:-8000}
 
       MCP_DISPLAY_NAME: ${MCP_DISPLAY_NAME:-BAUER GROUP Shlink}
