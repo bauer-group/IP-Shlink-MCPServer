@@ -1,3 +1,9 @@
+## [0.6.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.3...v0.6.0) (2026-05-18)
+
+### 🚀 Features
+
+* **extensions:** added config-driven prompts, resource templates, and bulk-export tasks ([11643ff](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/11643ff1476e3be8d6ecb564afcb73e13c1847e1))
+
 ## [0.5.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.2...v0.5.3) (2026-05-17)
 
 ### 🐛 Bug Fixes
