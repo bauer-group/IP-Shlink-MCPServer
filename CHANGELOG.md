@@ -1,3 +1,9 @@
+## [0.12.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.0...v0.12.1) (2026-05-18)
+
+### ♻️ Refactoring
+
+* **network:** made empty MCP_HOST the dual-stack default ([202e86c](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/202e86cc42f9db64b19ac8917327646e0296f8ae))
+
 ## [0.12.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.11.2...v0.12.0) (2026-05-18)
 
 ### 🚀 Features
