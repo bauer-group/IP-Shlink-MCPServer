@@ -125,7 +125,7 @@ services:
       - --maxmemory-policy
       - noeviction
     mem_limit: ${REDIS_CONTAINER_MEM_LIMIT:-192m}
-    mem_reservation: 32m
+    # mem_reservation: 32m
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
