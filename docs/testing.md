@@ -384,7 +384,7 @@ docker exec bg-shlink-mcp python src/main.py tools
 # Shlink reachability probe — exits 0 (healthy) or 1
 docker exec bg-shlink-mcp python src/main.py health
 
-# Run the pytest suite (53 tests, also gates the Docker build)
+# Run the pytest suite (116 tests, also gates the Docker build)
 docker exec bg-shlink-mcp pytest -q
 ```
 

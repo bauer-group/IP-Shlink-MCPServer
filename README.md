@@ -21,13 +21,16 @@
 | **Three deploy flavours** | Local development, self-hosted Traefik, Coolify-managed — same image, same source |
 | **Test-gated builds** | The Docker multi-stage build fails if pytest fails (no green push when tests are red) |
 | **Pinned tool surface** | Shlink's OpenAPI spec is baked into the image at build time — no startup HTTP fetch, deterministic per image tag; override `SHLINK_OPENAPI_URL` at runtime to track a live source |
-| **Restart-safe sessions** | Redis-backed OAuth client store with Fernet at-rest encryption — redeploys don't log users out |
+| **Restart-safe sessions** | Encrypted OAuth state store — Redis-backed (production) or disk-backed (single-node fallback). Both Fernet-encrypted at rest; redeploys don't log users out |
+| **Tenant allowlist** | Multi-tenant Entra deployments enforce an `ENTRA_ALLOWED_TENANTS` post-issuance check (`tid` claim), with optional audit-only mode for safe rollout |
+| **Token-bucket rate limiting** | Per-OAuth-subject (or proxy-aware client-IP) limiter on every MCP request — cheapest rejection path under load |
+| **Operator extensions** | Layer prompts, resource templates, and long-running export tasks on top of the auto-generated tool surface via a single `extensions.json` |
 
 ---
 
 ## Architecture
 
-```
+```text
                               AI Clients
                 ┌────────────┬───────────────┬────────────┐
                 │ Claude Web │ Claude Desktop│ MS Copilot │ ...
@@ -85,6 +88,7 @@ python scripts/generate-env.py
 ```
 
 Then edit `.env` to fill:
+
 - `SHLINK_URL` and `SHLINK_API_KEY` (`docker exec shlink shlink api-key:generate --name=mcp-server`)
 - `AUTH_MODE` + the matching provider block (see [docs/authentication.md](docs/authentication.md))
 - `PUBLIC_BASE_URL` to match the hostname you'll expose
@@ -117,7 +121,7 @@ See [docs/client-setup.md](docs/client-setup.md). Short version:
 
 ## Repository Layout
 
-```
+```text
 IP-Shlink-MCPServer/
 ├── README.md                        ← you are here
 ├── LICENSE                          ← MIT
@@ -139,20 +143,30 @@ IP-Shlink-MCPServer/
 │       │   ├── main.py              ← Typer CLI (serve / tools / health)
 │       │   ├── config.py            ← Pydantic Settings + AUTH_MODE validation
 │       │   ├── server.py            ← FastMCP construction + lifespan
+│       │   ├── rate_limit.py        ← Token-bucket limiter (sub/IP keyed)
 │       │   ├── logging_setup.py     ← structlog + Rich
 │       │   ├── auth/
 │       │   │   ├── provider_factory.py
 │       │   │   ├── entra.py
 │       │   │   ├── google.py
-│       │   │   └── generic_oidc.py
+│       │   │   ├── generic_oidc.py
+│       │   │   ├── middleware.py    ← Tenant allowlist (entra-multi)
+│       │   │   └── client_storage.py← Encrypted Redis/disk OAuth store
+│       │   ├── extensions/          ← Operator-defined prompts/resources/tasks
+│       │   │   ├── loader.py
+│       │   │   ├── config.py
+│       │   │   ├── prompts.py
+│       │   │   ├── resources.py
+│       │   │   └── tasks.py
 │       │   ├── shlink/
 │       │   │   ├── client.py
 │       │   │   ├── errors.py
 │       │   │   ├── openapi_loader.py
 │       │   │   └── tool_mapper.py
 │       │   └── static/
-│       │       └── index.html       ← landing page served at /
-│       └── tests/                   ← pytest (53 tests, gates Docker build)
+│       │       ├── index.html       ← landing page served at /
+│       │       └── logo.svg         ← consent-screen brand asset (/logo.svg)
+│       └── tests/                   ← pytest (116 tests, gates Docker build)
 │
 ├── docs/
 │   ├── SHLINK-MCP-SPEC.md           ← source spec
@@ -183,7 +197,7 @@ IP-Shlink-MCPServer/
 | Python | 3.13 / 3.14 | Container ships 3.14 Alpine |
 | Shlink | v3.x / v4.x / v5.x | OpenAPI spec baked in at build time (default `v5.0.1`, pin via `SHLINK_OPENAPI_VERSION` build-arg) |
 | FastMCP | ≥ 2.13 | `OIDCProxy`, `AzureProvider`, `GoogleProvider` |
-| Redis | 7.x / 8.x | OAuth client storage (production) |
+| Redis | 7.x / 8.x | OAuth client storage (recommended for production) — disk-backed fallback works without Redis |
 
 ---
 
@@ -197,6 +211,14 @@ IP-Shlink-MCPServer/
 - [docs/mcp-primitives.md](docs/mcp-primitives.md) — implementation guide for all 11 MCP Inspector tabs (Tools, Resources, Prompts, Tasks, Apps, Sampling, Elicitations, Roots, Auth, Metadata, Ping)
 - [docs/troubleshooting.md](docs/troubleshooting.md) — common errors & fixes
 - [docs/SHLINK-MCP-SPEC.md](docs/SHLINK-MCP-SPEC.md) — design specification (source of truth)
+
+---
+
+## Related Projects
+
+- **[bauer-group/CS-URLShortener](https://github.com/bauer-group/CS-URLShortener)** — the BAUER GROUP Shlink deployment this MCP server was built against. Containerised Shlink with our customer-facing branding, link policies, and operational scripts. If you want a working Shlink instance to point `SHLINK_URL` at, start there.
+- **[shlinkio/shlink](https://github.com/shlinkio/shlink)** — upstream Shlink. The OpenAPI spec baked into our image comes from this repo.
+- **[jlowin/fastmcp](https://github.com/jlowin/fastmcp)** — the MCP framework underneath. `AzureProvider`, `GoogleProvider`, `OIDCProxy`, and the streamable-HTTP transport all live here.
 
 ---
 

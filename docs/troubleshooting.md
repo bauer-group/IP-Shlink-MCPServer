@@ -26,10 +26,24 @@ state).
 
 Redis-backed client storage requires Fernet at-rest encryption. Generate
 once:
+
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
+
 Paste into `.env` as `AUTH_STORAGE_ENCRYPTION_KEY=`.
+
+> **No Redis?** Leave `AUTH_REDIS_URL` empty — the server falls back to
+> the disk-backed store at `AUTH_DISK_STORAGE_PATH`, which derives its key
+> from `AUTH_JWT_SIGNING_KEY` and needs no separate Fernet key. See
+> [authentication.md → OAuth Persistence](authentication.md#oauth-persistence).
+
+### `ValueError: AUTH_STORAGE_ENCRYPTION_KEY is not a valid Fernet key`
+
+The value isn't 32 url-safe base64 bytes (44 chars including the `=`
+padding). Operators occasionally paste a hex string or raw bytes — both
+are rejected at boot so the failure isn't surfaced hours later as a deep
+`InvalidToken` on the first login. Regenerate with the command above.
 
 ### `ValueError: AzureProvider requires at least one non-OIDC scope in required_scopes`
 
@@ -110,7 +124,59 @@ property to `2` and re-authenticate.
 ### Tokens stop working after every redeploy
 
 `AUTH_JWT_SIGNING_KEY` changed. Set it once and treat it like a long-lived
-secret (1Password vault item). Same for `AUTH_STORAGE_ENCRYPTION_KEY`.
+secret (1Password vault item).
+
+- **Redis mode:** also keep `AUTH_STORAGE_ENCRYPTION_KEY` stable. Rotating
+  it makes every Redis-stored DCR client look like ciphertext-with-wrong-key
+  → every client re-registers.
+- **Disk mode:** the storage key is *derived* from `AUTH_JWT_SIGNING_KEY`,
+  so rotating the JWT key implicitly invalidates the disk-store contents.
+  Treat the JWT key as load-bearing for both layers.
+
+### Multi-tenant: `TenantNotAllowedError` after a successful login
+
+`AUTH_MODE=entra-multi` is active and the caller's token `tid` claim isn't on
+`ENTRA_ALLOWED_TENANTS`. The middleware logs `auth.tenant_denied` with the
+rejected `tid`, the caller's `sub`, and the MCP method that was attempted.
+Either add the tenant to the allowlist or rescind the consent in that tenant's
+Entra portal.
+
+If you're rolling the allowlist out for the first time and want to *observe*
+which tenants are calling before enforcing, flip `TenantAllowlistMiddleware`'s
+`audit_only` flag — denied requests pass through but log
+`auth.tenant_denied_audit_only_passing_through`. See
+[authentication.md → Microsoft Entra ID — Multi Tenant](authentication.md#microsoft-entra-id--multi-tenant).
+
+---
+
+## Rate limiting
+
+### `429 Too Many Requests`
+
+The token-bucket limiter rejected the call. Defaults: 10 req/s sustained,
+20-token burst, *per OAuth subject* when authenticated and *per source IP*
+when anonymous.
+
+Look at `RATE_LIMITER_MAX_REQUESTS_PER_SECOND` and `RATE_LIMITER_BURST_CAPACITY`
+in `.env`. Bump them if a real workload legitimately exceeds the budget. Keep
+`RATE_LIMITER_GLOBAL=false` unless you specifically want a single shared
+bucket for the whole server (DoS shield only — fairer to keep per-client).
+
+### Every request from behind Cloudflare/Traefik shares one bucket
+
+The limiter sees the proxy's IP instead of the client's. Behind a reverse
+proxy the rightmost-N trusted hop in `X-Forwarded-For` is the only address
+the server can verify (everything to the left could be a spoofed header).
+
+Set `RATE_LIMITER_TRUSTED_PROXY_HOPS` to the number of trusted proxies in
+front of `shlink-mcp`:
+
+- `1` — direct Traefik / Coolify default
+- `2` — Cloudflare → Traefik
+- `0` — no proxy; XFF is ignored entirely
+
+Authenticated requests are keyed on the OAuth subject regardless of this
+setting — only anonymous traffic is affected.
 
 ---
 

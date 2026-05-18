@@ -7,22 +7,34 @@ client-connection instructions.
 
 ## Internal Architecture
 
-```
+```text
 src/
   config.py              Pydantic-Settings model + AUTH_MODE validation
   logging_setup.py       structlog + Rich (console / json modes)
-  server.py              FastMCP construction + lifespan
+  server.py              FastMCP construction + lifespan + middleware wiring
   main.py                Typer CLI (serve / tools / health)
+  rate_limit.py          Token-bucket limiter, OAuth-subject / proxy-aware IP keyed
   auth/
     provider_factory.py  AUTH_MODE -> concrete provider
     entra.py             Microsoft Entra (single + multi tenant)
     google.py            Google Workspace
     generic_oidc.py      Authentik / Keycloak / Zitadel / Auth0 / Okta / ...
+    middleware.py        Tenant allowlist for entra-multi (enforce / audit-only)
+    client_storage.py    Encrypted OAuth state store (Redis or disk fallback)
+  extensions/
+    loader.py            Reads extensions.json, registers prompts/resources/tasks
+    config.py            Operator-config schema + validators
+    prompts.py           Slash-command-like workflows
+    resources.py         Static + templated MCP resources
+    tasks.py             Long-running export tasks (poll for completion)
   shlink/
     client.py            Async httpx wrapper (X-Api-Key, retries, error mapping)
     errors.py            Typed exception hierarchy mapped from problem+json
     openapi_loader.py    Cached spec fetch + background refresh
     tool_mapper.py       FastMCP.from_openapi() route maps + name overrides
+  static/
+    index.html           Landing page served at /
+    logo.svg             Consent-screen brand asset served at /logo.svg
 ```
 
 Two trust boundaries that never mix:
@@ -43,7 +55,7 @@ docker build -t bg-shlink-mcp .                     # full pipeline (test gates 
 
 ## Test
 
-```
+```bash
 pip install ".[test]"
 pytest -v
 ```

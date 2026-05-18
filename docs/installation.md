@@ -32,10 +32,12 @@ python scripts/generate-env.py --force
 ```
 
 `generate-env.py` writes secure random values for:
+
 - `AUTH_JWT_SIGNING_KEY` (32-byte hex)
-- `AUTH_STORAGE_ENCRYPTION_KEY` (Fernet key)
+- `AUTH_STORAGE_ENCRYPTION_KEY` (Fernet key — used by the Redis-backed store)
 
 You must still fill in by hand:
+
 - `SHLINK_URL`
 - `SHLINK_API_KEY` (from the Shlink container, see above)
 - `AUTH_MODE` + the matching provider block — see [authentication.md](authentication.md)
@@ -126,7 +128,7 @@ automatically. No `proxy` network needed on your side.
 
 After deployment, walk through:
 
-- [ ] `docker compose -f docker-compose.<flavour>.yml ps` shows `shlink-mcp` and `redis` both healthy
+- [ ] `docker compose -f docker-compose.<flavour>.yml ps` shows `shlink-mcp` healthy (plus `redis` when `AUTH_REDIS_URL` is set)
 - [ ] `curl -fsS https://<host>/healthz` returns `{"status":"ok"}`
 - [ ] `curl -fsS https://<host>/.well-known/oauth-protected-resource` returns RFC 9728 JSON pointing at your IdP
 - [ ] A real MCP client (Claude Web, mcp-inspector) completes the OAuth flow
@@ -144,13 +146,26 @@ docker compose -f docker-compose.traefik.yml pull
 docker compose -f docker-compose.traefik.yml up -d
 ```
 
-Restart-safe sessions are stored in Redis with Fernet at-rest encryption, so
-upgrading does *not* log existing users out as long as you keep
-`AUTH_STORAGE_ENCRYPTION_KEY` and `AUTH_JWT_SIGNING_KEY` stable.
+OAuth state (DCR clients, refresh tokens, JTI mappings, in-flight transactions)
+is persisted across container restarts so upgrading does *not* log existing
+users out. Two backends — pick one per deployment, both encrypted at rest:
+
+| Backend | Activated by | Encryption key | Persistence |
+| --- | --- | --- | --- |
+| Redis (recommended for production) | `AUTH_REDIS_URL` set | Operator-set `AUTH_STORAGE_ENCRYPTION_KEY` (Fernet) | Redis AOF volume |
+| Disk fallback | `AUTH_REDIS_URL` empty | Derived from `AUTH_JWT_SIGNING_KEY` via HKDF | Bind volume at `AUTH_DISK_STORAGE_PATH` (default `/app/data/oauth-storage`, mounted by the bundled compose files) |
+
+Either way, **keep `AUTH_JWT_SIGNING_KEY` stable across deploys** — it signs
+the bearer tokens FastMCP issues to clients AND (in disk mode) derives the
+storage encryption key. Same for `AUTH_STORAGE_ENCRYPTION_KEY` in Redis mode.
 
 ---
 
 ## 5 · Redis Sizing
+
+> Skip this section if you're running the disk-storage fallback
+> (`AUTH_REDIS_URL` empty). The bundled compose files start a Redis service
+> by default but you can disable it for single-node deployments.
 
 Redis holds OAuth state: Dynamic Client Registrations (DCR) plus issued
 bearer/refresh tokens. The working set is tiny — single-digit megabytes for a

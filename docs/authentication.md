@@ -190,7 +190,18 @@ ENTRA_ALLOWED_TENANTS=11111111-1111-1111-1111-111111111111,2222...
 ```
 
 The provider validates JWT signatures via the multi-tenant JWKS endpoint, then
-a post-issuance check rejects tokens whose `tid` claim isn't on the allowlist.
+a post-issuance middleware check rejects tokens whose `tid` claim isn't on the
+allowlist. Rejected requests are logged as `auth.tenant_denied`
+(`tid`, `sub`, `method`, `allowed_tenants`) and the caller receives a
+`TenantNotAllowedError` JSON-RPC error.
+
+> **Rolling out the allowlist?** The middleware supports an audit-only mode
+> that logs `auth.tenant_denied_audit_only_passing_through` *without* blocking
+> the request — useful when introducing the allowlist on an existing
+> deployment so you can confirm which tenants are calling before flipping
+> to enforcement. The mode is controlled in code (`TenantAllowlistMiddleware`
+> in `app/bg-shlink-mcp/src/auth/middleware.py`), not via env var, to keep
+> the policy explicit and reviewable.
 
 ---
 
@@ -288,30 +299,66 @@ ${PUBLIC_BASE_URL}/auth/callback
 
 ## OAuth Persistence
 
-Two configuration concerns survive across container restarts:
+FastMCP issues bearer tokens and tracks several pieces of OAuth state on
+behalf of every connected client:
 
-### `AUTH_JWT_SIGNING_KEY`
+- DCR-registered client metadata (name, redirect URIs, client secret)
+- Active authorization codes + PKCE challenges
+- Refresh-token hash → upstream-token-id mappings
+- FastMCP-issued JWT JTI → upstream-token mappings
+- In-flight OAuth transactions (state, nonce, callback context)
 
-Signs the bearer tokens FastMCP issues to clients. **Must** be stable across
-restarts — otherwise every redeploy invalidates active sessions and forces
-every user to re-auth.
+Every one of those must outlive a container restart — otherwise every
+redeploy forces every client to re-register via DCR and every user to
+re-authenticate. The server therefore *always* wires an explicit, encrypted
+store. Two backends, pick one:
 
-Generate once and store securely:
+### Production (recommended): Redis-backed store
 
-```bash
-openssl rand -hex 32
+```ini
+AUTH_REDIS_URL=redis://redis:6379/0
+AUTH_STORAGE_ENCRYPTION_KEY=<fernet key>
 ```
 
-### `AUTH_REDIS_URL` + `AUTH_STORAGE_ENCRYPTION_KEY`
-
-Redis stores OAuth Dynamic Client Registrations (DCR). The Fernet key
-encrypts client secrets at rest so plaintext never lands in Redis.
+Generate the Fernet key once:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-The Traefik and Coolify compose files ship a Redis service by default.
+Survives container restarts (Redis AOF), survives container *replacement*
+(rolling deploys), and supports horizontal scaling — multiple `shlink-mcp`
+replicas share one Redis instance. The Traefik and Coolify compose files
+ship a Redis service by default.
+
+### Single-node fallback: disk-backed store
+
+```ini
+AUTH_REDIS_URL=
+AUTH_DISK_STORAGE_PATH=/app/data/oauth-storage
+```
+
+When `AUTH_REDIS_URL` is empty, the server falls back to a Fernet-encrypted
+DiskStore at `AUTH_DISK_STORAGE_PATH` (default `/app/data/oauth-storage`).
+The encryption key is *derived* from `AUTH_JWT_SIGNING_KEY` via HKDF — no
+separate Fernet key required. The bundled Traefik / Coolify compose files
+mount this path as the `oauth-data` volume so the fallback is volume-safe
+even on stacks that started with Redis and disabled it later.
+
+> **Mount it as a volume.** If you run the disk fallback without mounting
+> `AUTH_DISK_STORAGE_PATH` to a real volume, every container restart wipes
+> OAuth state — exactly the bug this storage layer exists to prevent.
+
+### `AUTH_JWT_SIGNING_KEY` (always required, any mode)
+
+Signs the bearer tokens FastMCP issues to clients AND (in disk mode)
+derives the storage encryption key. **Must** be stable across restarts —
+otherwise every redeploy invalidates active sessions and forces every user
+to re-auth.
+
+```bash
+openssl rand -hex 32
+```
 
 ---
 
