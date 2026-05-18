@@ -1,3 +1,9 @@
+## [0.6.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.6.0...v0.6.1) (2026-05-18)
+
+### 🐛 Bug Fixes
+
+* **extensions:** switched export_short_urls to task=required and dropped unused ttl_seconds ([40ce5d8](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/40ce5d85881b66e31290e13219385213c9f1db17))
+
 ## [0.6.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.5.3...v0.6.0) (2026-05-18)
 
 ### 🚀 Features
