@@ -48,8 +48,12 @@ dependencies = [
     "structlog>=24.4.0,<26.0.0",
     "rich>=13.7.0,<15.0.0",
 
-    # Optional Redis-backed OAuth client store + at-rest Fernet encryption.
-    "redis>=5.2.0,<8.0.0",
+    # OAuth client-state storage. Both branches of build_client_storage()
+    # need the underlying store class to import — DiskStore needs diskcache
+    # (the [disk] extra), RedisStore needs the redis client (the [redis]
+    # extra). FastMCP depends on py-key-value-aio with no extras, so we
+    # request both explicitly. + at-rest Fernet encryption.
+    "py-key-value-aio[disk,redis]>=0.4.4,<1.0.0",
     "cryptography>=43.0.0,<49.0.0",
 
     # Optional error tracking — loaded lazily, controlled by SENTRY_DSN.
