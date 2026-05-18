@@ -95,8 +95,11 @@ services:
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}
 
+    expose:
+      - ${MCP_PORT:-8000}
+
     ports:
-      - "${SHLINK_MCP_PORT:-8000}:8000"
+      - "${SHLINK_MCP_PORT:-8000}:${MCP_PORT:-8000}"
 
     depends_on:
       redis:
@@ -106,7 +109,7 @@ services:
       - local
 
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:${MCP_PORT:-8000}/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -135,6 +138,8 @@ services:
       - noeviction
     mem_limit: ${REDIS_CONTAINER_MEM_LIMIT:-192m}
     # mem_reservation: 32m
+    expose:
+      - 6379    
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:

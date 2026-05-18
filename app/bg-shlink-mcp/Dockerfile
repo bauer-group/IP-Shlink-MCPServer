@@ -146,8 +146,15 @@ EXPOSE 8000
 
 # /healthz returns 200 OK as soon as the FastMCP lifespan reports ready.
 # Distinct from Shlink's /health (which sits behind the OAuth wall).
+#
+# Shell-form CMD so ${MCP_PORT:-8000} is expanded by /bin/sh at runtime —
+# matches the variable bind port in main.py. The :-8000 fallback covers
+# the bare `docker run` case where MCP_PORT isn't set; Compose stacks
+# already pass MCP_PORT explicitly. Note Compose's healthcheck block
+# replaces this one entirely when present, so this is the fallback for
+# image consumers who don't use our Compose files.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:8000/healthz || exit 1
+    CMD curl -fsS http://localhost:${MCP_PORT:-8000}/healthz || exit 1
 
 # tini as PID 1 forwards SIGTERM cleanly to the python process so `docker stop`
 # triggers a graceful FastMCP lifespan shutdown instead of a 10s SIGKILL wait.
