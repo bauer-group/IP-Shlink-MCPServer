@@ -1,3 +1,9 @@
+## [0.12.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.11.2...v0.12.0) (2026-05-18)
+
+### 🚀 Features
+
+* **network:** forced dual-stack via socket monkey-patch + restored "::" default ([27c9a14](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/27c9a14759b72456a4c573c577f33bbcf17cd893))
+
 ## [0.11.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.11.1...v0.11.2) (2026-05-18)
 
 ### 🐛 Bug Fixes
