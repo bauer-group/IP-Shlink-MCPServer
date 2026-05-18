@@ -177,7 +177,7 @@ create_mode() {
     app_json=$(az ad app create \
         --display-name "$DISPLAY_NAME" \
         --sign-in-audience AzureADMyOrg \
-        --web-redirect-uris "http://localhost:$LOCAL_PORT/auth/azure/callback" "https://$HOSTNAME_ARG/auth/azure/callback" \
+        --web-redirect-uris "http://localhost:$LOCAL_PORT/auth/callback" "https://$HOSTNAME_ARG/auth/callback" \
         --required-resource-accesses "$initial_required_access" \
         --output json)
     local app_id obj_id

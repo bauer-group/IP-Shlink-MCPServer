@@ -157,7 +157,7 @@ function New-AzureMcpApp {
         $app = az ad app create `
             --display-name $DisplayName `
             --sign-in-audience AzureADMyOrg `
-            --web-redirect-uris "http://localhost:$LocalPort/auth/azure/callback" "https://$Hostname/auth/azure/callback" `
+            --web-redirect-uris "http://localhost:$LocalPort/auth/callback" "https://$Hostname/auth/callback" `
             --required-resource-accesses "@$tmpInitial" `
             --output json | ConvertFrom-Json
     } finally {

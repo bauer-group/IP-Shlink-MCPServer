@@ -99,13 +99,21 @@ async def build_app(settings: Settings | None = None) -> "FastMCP":
             await shlink_client.aclose()
             logger.info("server.shutdown_complete")
 
+    # Default icon URL: served by this server at /logo.svg so a fresh install
+    # has a working brand asset without operators hosting one elsewhere.
+    base_url = str(settings.public_base_url).rstrip("/")
+    icon_url = settings.mcp_icon_url or f"{base_url}/logo.svg"
+    website_url = settings.mcp_website_url or None
+
     mcp = build_mcp_from_spec(
-        name="bg-shlink-mcp",
+        name=settings.mcp_display_name,
         instructions=SERVER_INSTRUCTIONS,
         spec=spec_cache.current.spec,
         http_client=shlink_client.httpx_client,
         auth=auth_provider,
         lifespan=lifespan,
+        icon_url=icon_url,
+        website_url=website_url,
     )
 
     # Layer operator-defined prompts / resource templates / export tasks on
@@ -119,8 +127,35 @@ async def build_app(settings: Settings | None = None) -> "FastMCP":
     )
 
     _register_healthz_route(mcp)
+    _register_logo_route(mcp)
     _register_index_route(mcp, settings)
     return mcp
+
+
+def _register_logo_route(mcp: "FastMCP") -> None:
+    """
+    Serve /logo.svg so the OAuth consent screen can fetch the brand icon
+    from the same origin as the MCP server (no CORS surprises).
+
+    Read once at startup and cached in the closure - the file is immutable
+    at runtime, no point re-reading on each probe.
+    """
+    from starlette.responses import Response
+
+    logo_path = Path(__file__).parent / "static" / "logo.svg"
+    try:
+        svg_bytes = logo_path.read_bytes()
+    except FileNotFoundError:
+        logger.warning("logo.template_missing", path=str(logo_path))
+        return
+
+    @mcp.custom_route("/logo.svg", methods=["GET"], include_in_schema=False)
+    async def _logo(_request) -> Response:  # type: ignore[no-untyped-def]
+        return Response(
+            svg_bytes,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
 
 def _register_index_route(mcp: "FastMCP", settings: Settings) -> None:

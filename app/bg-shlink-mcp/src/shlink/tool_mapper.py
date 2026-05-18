@@ -305,13 +305,21 @@ def build_mcp_from_spec(
     http_client: httpx.AsyncClient,
     auth: Any | None = None,
     lifespan: Any | None = None,
+    icon_url: str | None = None,
+    website_url: str | None = None,
 ) -> FastMCP:
     """
     Build a FastMCP server with tools auto-generated from the spec.
 
     Kept thin on purpose - real wiring (config -> client -> spec -> mcp) lives
     in server.py. This function is unit-testable with a stub spec + httpx client.
+
+    `icon_url` and `website_url` are surfaced on the OAuth consent screen
+    rendered by FastMCP's OAuthProxy. Both are optional - omitting them falls
+    back to FastMCP's defaults (no icon, plain-text server name).
     """
+    from mcp.types import Icon
+
     counters = _BuildCounters()
 
     spec = _normalize_spec_for_v3(spec)
@@ -330,6 +338,11 @@ def build_mcp_from_spec(
         kwargs["auth"] = auth
     if lifespan is not None:
         kwargs["lifespan"] = lifespan
+    if icon_url:
+        # FastMCP picks icons[0] for the consent screen.
+        kwargs["icons"] = [Icon(src=icon_url, mimeType="image/svg+xml")]
+    if website_url:
+        kwargs["website_url"] = website_url
 
     mcp = FastMCP.from_openapi(**kwargs)
     logger.info(

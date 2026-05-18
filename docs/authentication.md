@@ -112,7 +112,7 @@ If you'd rather click through the Azure Portal (or your auditor needs to see the
 1. <https://portal.azure.com> → Microsoft Entra ID → App registrations → **New registration**
 2. **Name**: `Shlink MCP Server` (or your own naming convention)
 3. **Supported account types**: *Accounts in this organizational directory only (Single tenant)*
-4. **Redirect URI**: Platform = **Web**, URI = `${PUBLIC_BASE_URL}/auth/azure/callback`
+4. **Redirect URI**: Platform = **Web**, URI = `${PUBLIC_BASE_URL}/auth/callback`
 5. Save
 
 #### 2 · API permissions (delegated, Microsoft Graph)
@@ -164,7 +164,7 @@ ENTRA_TENANT_ID=<Directory (tenant) ID>
 | Setting | Value |
 | --- | --- |
 | MCP `PUBLIC_BASE_URL` | `https://shlink-mcp.example.com` |
-| Entra Redirect URI | `https://shlink-mcp.example.com/auth/azure/callback` |
+| Entra Redirect URI | `https://shlink-mcp.example.com/auth/callback` |
 | **MUST match exactly** | scheme, host, case, no trailing slash |
 
 ---
@@ -201,7 +201,7 @@ a post-issuance check rejects tokens whose `tid` claim isn't on the allowlist.
 1. <https://console.cloud.google.com/apis/credentials>
 2. **Create credentials → OAuth client ID**.
 3. **Application type**: Web application.
-4. **Authorized redirect URI**: `${PUBLIC_BASE_URL}/auth/google/callback`.
+4. **Authorized redirect URI**: `${PUBLIC_BASE_URL}/auth/callback`.
 
 ### 2 · OAuth consent screen
 
@@ -224,7 +224,7 @@ personal Gmail.
 | Setting | Value |
 | --- | --- |
 | MCP `PUBLIC_BASE_URL` | `https://shlink-mcp.example.com` |
-| Google Redirect URI | `https://shlink-mcp.example.com/auth/google/callback` |
+| Google Redirect URI | `https://shlink-mcp.example.com/auth/callback` |
 
 ---
 
@@ -266,18 +266,23 @@ OIDC_SCOPES=openid profile email
 ### Redirect URI
 
 ```text
-${PUBLIC_BASE_URL}/auth/oidc/callback
+${PUBLIC_BASE_URL}/auth/callback
 ```
+
+> **Note:** FastMCP's `OAuthProxy` uses a single redirect path (`/auth/callback`)
+> for **every** upstream provider (Entra, Google, generic OIDC). There is no
+> per-provider sub-path — the IdP only needs to round-trip the user back, not
+> identify itself in the URL.
 
 ### Per-IdP redirect URI table
 
 | IdP | Configuration UI path | Required value |
 | --- | --- | --- |
-| Authentik | Applications → Providers → OAuth2 Provider → Redirect URIs | `https://your-host/auth/oidc/callback` |
-| Keycloak | Realm → Clients → your-client → Valid Redirect URIs | `https://your-host/auth/oidc/callback` |
-| Zitadel | Projects → your-project → Applications → Redirect URIs | `https://your-host/auth/oidc/callback` |
-| Auth0 | Applications → your-app → Allowed Callback URLs | `https://your-host/auth/oidc/callback` |
-| Okta | Applications → your-app → General → Sign-in redirect URIs | `https://your-host/auth/oidc/callback` |
+| Authentik | Applications → Providers → OAuth2 Provider → Redirect URIs | `https://your-host/auth/callback` |
+| Keycloak | Realm → Clients → your-client → Valid Redirect URIs | `https://your-host/auth/callback` |
+| Zitadel | Projects → your-project → Applications → Redirect URIs | `https://your-host/auth/callback` |
+| Auth0 | Applications → your-app → Allowed Callback URLs | `https://your-host/auth/callback` |
+| Okta | Applications → your-app → General → Sign-in redirect URIs | `https://your-host/auth/callback` |
 
 ---
 

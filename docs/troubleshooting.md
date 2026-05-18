@@ -68,9 +68,12 @@ exact values:
 
 | `AUTH_MODE` | Redirect URI |
 | --- | --- |
-| `entra-single` / `entra-multi` | `${PUBLIC_BASE_URL}/auth/azure/callback` |
-| `google` | `${PUBLIC_BASE_URL}/auth/google/callback` |
-| `oidc` | `${PUBLIC_BASE_URL}/auth/oidc/callback` |
+| `entra-single` / `entra-multi` | `${PUBLIC_BASE_URL}/auth/callback` |
+| `google` | `${PUBLIC_BASE_URL}/auth/callback` |
+| `oidc` | `${PUBLIC_BASE_URL}/auth/callback` |
+
+FastMCP's `OAuthProxy` uses a single shared redirect path for every upstream
+provider — there is no `/auth/azure/`, `/auth/google/` or `/auth/oidc/` sub-path.
 
 Watch out for:
 - Case mismatch (some IdPs are case-sensitive)

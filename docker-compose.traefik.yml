@@ -47,6 +47,10 @@ services:
       MCP_HOST: ${MCP_HOST:-0.0.0.0}
       MCP_PORT: ${MCP_PORT:-8000}
 
+      MCP_DISPLAY_NAME: ${MCP_DISPLAY_NAME:-BAUER GROUP Shlink}
+      MCP_ICON_URL: ${MCP_ICON_URL:-}
+      MCP_WEBSITE_URL: ${MCP_WEBSITE_URL:-https://go.bauer-group.com/mcp-server}
+
       LOG_FORMAT: ${LOG_FORMAT:-json}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 

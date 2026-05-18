@@ -124,6 +124,35 @@ class Settings(BaseSettings):
     mcp_host: str = "0.0.0.0"
     mcp_port: int = Field(default=8000, ge=1, le=65535)
 
+    # ── MCP server identity (consent screen branding) ──────────────────────
+    # These three values appear on FastMCP's OAuth consent screen — the dialog
+    # an AI client (Claude, Copilot, …) renders to the user before the first
+    # token exchange. Operators rebrand a deployment by overriding them; the
+    # defaults match the BAUER GROUP reference install.
+    mcp_display_name: str = Field(
+        default="BAUER GROUP Shlink",
+        description=(
+            "Friendly name shown on the OAuth consent screen ('wants to access "
+            "the MCP server <name>'). Plain text, not the FastMCP internal "
+            "identifier (which stays 'bg-shlink-mcp')."
+        ),
+    )
+    mcp_icon_url: str | None = Field(
+        default=None,
+        description=(
+            "Absolute URL to the icon shown on the consent screen. Leave unset "
+            "to use the BAUER GROUP logo served by this server at "
+            "${PUBLIC_BASE_URL}/logo.svg. Override with any HTTPS URL."
+        ),
+    )
+    mcp_website_url: str | None = Field(
+        default="https://go.bauer-group.com/mcp-server",
+        description=(
+            "Website link rendered behind the server name on the consent "
+            "screen. Set to empty string to disable the hyperlink."
+        ),
+    )
+
     # ── Auth ───────────────────────────────────────────────────────────────
     auth_mode: AuthMode = AuthMode.NONE
     auth_jwt_signing_key: SecretStr = Field(
