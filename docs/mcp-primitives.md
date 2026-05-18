@@ -707,6 +707,7 @@ haven't (yet) split scopes per tool:
 - BAUER GROUP deployments today gate identity at the IdP, not per-tool
 
 When to revisit:
+
 - Multi-user deployments where some users should only read
 - Compliance regimes requiring per-tool audit trails of *which scope was used*
 
@@ -862,9 +863,8 @@ match exactly.
   "formats": ["csv", "json"],                // first entry is the default
   "page_size": 200,
   "task": {
-    "mode": "optional",                       // optional | required
-    "poll_interval_seconds": 2.0,
-    "ttl_seconds": 900
+    "mode": "required",                       // optional | required
+    "poll_interval_seconds": 2.0
   }
 }
 ```
@@ -872,6 +872,20 @@ match exactly.
 Validation: `exporter` must reference a class registered in
 `_EXPORTERS` (Pydantic `Literal["short_urls"]`); `formats` must be
 non-empty and unique.
+
+**`mode` semantics:**
+
+- `"optional"` — clients pick per call (`call_tool(..., task=True|False)`).
+  Default is sync; the Tasks tab stays empty unless the client opts in.
+- `"required"` — sync mode is rejected; every call goes through the task
+  queue and surfaces in the Tasks tab. The right choice for bulk
+  operations whose result shouldn't pollute the LLM's context window.
+
+**Why no `ttl_seconds`:** FastMCP's `TaskConfig` only exposes `mode` and
+`poll_interval`. The task TTL is a per-call client knob
+(`call_tool(..., ttl=...)`, default 60s) with no server-side default
+override. Exposing it in operator config would be cargo-cult — it would
+silently do nothing.
 
 ---
 
@@ -927,7 +941,7 @@ Sorted by value-to-effort ratio. Updated as features land.
 
 ## Quick reference card
 
-```
+```text
                 ┌─────────────────────────────────────────────────────┐
                 │                MCP Component Primitives             │
                 │                                                     │

@@ -146,15 +146,14 @@
     {
       "name": "export_short_urls",
       "title": "Export Short URLs",
-      "description": "Bulk-export every short URL on this Shlink instance as CSV or JSON. Pages through the entire inventory; large instances may take a few seconds.",
+      "description": "Bulk-export every short URL on this Shlink instance as CSV or JSON. Runs as an MCP task — the AI receives a task_id and polls until completion. Pages through the entire inventory; large instances may take a few seconds.",
       "tags": ["export", "bulk"],
       "exporter": "short_urls",
       "formats": ["csv", "json"],
       "page_size": 200,
       "task": {
-        "mode": "optional",
-        "poll_interval_seconds": 2.0,
-        "ttl_seconds": 900
+        "mode": "required",
+        "poll_interval_seconds": 2.0
       }
     }
   ]

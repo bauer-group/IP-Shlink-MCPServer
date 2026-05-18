@@ -176,11 +176,16 @@ class ResourceConfig(_StrictBase):
 
 
 class TaskExecutionConfig(_StrictBase):
-    """How a task runs — surfaces FastMCP TaskConfig knobs to operators."""
+    """How a task runs — surfaces FastMCP TaskConfig knobs to operators.
+
+    Note: TTL is intentionally NOT here. FastMCP's `TaskConfig` only exposes
+    `mode` and `poll_interval`; the task TTL is a per-call client knob
+    (`call_tool(..., ttl=...)`) and has no server-side default override.
+    Adding `ttl_seconds` here would be cargo-cult config that does nothing.
+    """
 
     mode: Literal["optional", "required"] = "optional"
     poll_interval_seconds: float = Field(default=5.0, ge=0.5, le=60.0)
-    ttl_seconds: int = Field(default=600, ge=10, le=3600)
 
 
 class ExportTaskConfig(_StrictBase):
