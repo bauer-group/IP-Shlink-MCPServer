@@ -1,3 +1,9 @@
+## [0.10.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.2...v0.10.3) (2026-05-18)
+
+### 🐛 Bug Fixes
+
+* **deps:** added py-key-value-aio[disk,redis] for OAuth state store ([a930bce](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/a930bcee499717cc3b2446ac13050e722bce8beb))
+
 ## [0.10.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.10.1...v0.10.2) (2026-05-18)
 
 ### 🐛 Bug Fixes
