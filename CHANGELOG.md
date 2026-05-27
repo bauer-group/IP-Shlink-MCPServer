@@ -1,3 +1,5 @@
+## [0.12.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.1...v0.12.2) (2026-05-27)
+
 ## [0.12.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.0...v0.12.1) (2026-05-18)
 
 ### ♻️ Refactoring
