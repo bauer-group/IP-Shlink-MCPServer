@@ -46,7 +46,7 @@ dependencies = [
 
     # Structured logging + pretty dev console.
     "structlog>=24.4.0,<26.0.0",
-    "rich>=13.7.0,<15.0.0",
+    "rich>=13.7.0,<16.0.0",
 
     # OAuth client-state storage. Both branches of build_client_storage()
     # need the underlying store class to import — DiskStore needs diskcache
