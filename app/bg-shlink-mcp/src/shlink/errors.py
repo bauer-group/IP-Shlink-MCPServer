@@ -88,7 +88,7 @@ PROBLEM_TYPE_TO_EXC: dict[str, type[ShlinkError]] = {
 def from_status(status: int, *, body: dict[str, Any] | None = None, message: str | None = None) -> ShlinkError:
     """Pick the most specific exception class for an HTTP status."""
     body = body or {}
-    problem_type = body.get("type") or body.get("detail") and body.get("type")
+    problem_type = body.get("type")
     detail = (
         body.get("detail")
         or body.get("title")
