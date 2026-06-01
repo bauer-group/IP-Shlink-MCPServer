@@ -1,181 +1,44 @@
-"""
-Shlink MCP Server - CLI entrypoint.
+"""bg-shlink-mcp — CLI entrypoint.
 
-Subcommands:
-  serve      Run the MCP server (default when no command is given)
-  tools      Print the auto-generated tool catalogue (for docs/tools.md)
-  health     Probe Shlink + IdP discovery and exit 0/1
+A thin, profile-driven bg-mcpcore server: the declarative profile
+(``profiles/shlink.json``) plus the one Shlink-specific seam in ``server.py``
+(the bulk-export task). ``make_cli`` builds the Typer ``serve`` command, applies
+the dual-stack socket patch, and assembles the FastMCP instance from the profile
++ settings. The 25 OpenAPI tools, the prompt + resource catalogue, all five
+inbound auth modes, and the static X-Api-Key outbound auth are pure config.
 
-Designed to be the container ENTRYPOINT. `tini --` handles signal forwarding;
-typer handles arg parsing and help screens.
+Container liveness: hit the unauthenticated ``/healthz`` route (served by the
+framework) — there is no longer a ``health`` / ``tools`` CLI subcommand.
 """
 
 from __future__ import annotations
 
-import asyncio
-import socket as _socket
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
-from typing import Optional
 
-_orig_socket = _socket.socket
+# Make `server`, `config` importable when run from source (`python src/main.py`)
+# as well as when installed (src is flattened to root).
+_SRC = Path(__file__).resolve().parent
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
+from bg_mcpcore import load_profile, make_cli  # noqa: E402
 
-class _DualStackSocket(_orig_socket):  # type: ignore[misc, valid-type]
-    # asyncio hardcodes IPV6_V6ONLY=1 on v6 server sockets; coerce back to 0
-    # so a "::" bind accepts both IPv6 and v4-mapped IPv4 in one listener.
-    def setsockopt(self, level, optname, value):  # type: ignore[override]
-        if level == _socket.IPPROTO_IPV6 and optname == _socket.IPV6_V6ONLY and value:
-            value = 0
-        return super().setsockopt(level, optname, value)
+from config import Settings  # noqa: E402
 
+try:
+    _VERSION = _pkg_version("bg-shlink-mcp")
+except PackageNotFoundError:
+    _VERSION = "0.0.0+local"
 
-_socket.socket = _DualStackSocket  # type: ignore[misc]
-
-# Allow `python src/main.py` to resolve the package even without an install.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import typer  # noqa: E402
-import structlog  # noqa: E402
-
-from config import Settings, get_settings  # noqa: E402
-from logging_setup import setup_logging  # noqa: E402
-
-app = typer.Typer(
-    name="bg-shlink-mcp",
-    help="Remote MCP server for self-hosted Shlink.",
-    no_args_is_help=False,
-    add_completion=False,
+app = make_cli(
+    load_profile(str(_SRC / "profiles" / "shlink.json")),
+    settings_cls=Settings,
+    version=_VERSION,
+    static_dir=str(_SRC / "static"),
 )
-
-
-@app.callback(invoke_without_command=True)
-def _default(ctx: typer.Context) -> None:
-    """Default to `serve` when called with no subcommand."""
-    if ctx.invoked_subcommand is None:
-        ctx.invoke(serve)
-
-
-# ── serve ─────────────────────────────────────────────────────────────────────
-
-
-@app.command()
-def serve(
-    host: Optional[str] = typer.Option(
-        None,
-        "--host",
-        help="Bind address (overrides MCP_HOST)",
-    ),
-    port: Optional[int] = typer.Option(
-        None,
-        "--port",
-        help="Listen port (overrides MCP_PORT)",
-    ),
-    transport: Optional[str] = typer.Option(
-        None,
-        "--transport",
-        help="MCP transport: streamable-http (default) or stdio",
-    ),
-) -> None:
-    """Run the MCP server (default mode)."""
-    from server import build_app
-
-    settings = get_settings()
-    if host is not None:
-        settings.mcp_host = host
-    if port:
-        settings.mcp_port = port
-    chosen_transport = transport or settings.mcp_transport
-
-    asyncio.run(_serve_async(settings, chosen_transport))
-
-
-async def _serve_async(settings: Settings, transport: str) -> None:
-    """Build the app and hand off to FastMCP's transport runner."""
-    from server import build_app
-
-    mcp = await build_app(settings)
-    # Empty MCP_HOST means "any stack, any interface" — bind "::" so the
-    # dual-stack monkey-patch above produces a v6+v4 listener.
-    bind_host = settings.mcp_host or "::"
-    logger = structlog.stdlib.get_logger("bg-shlink-mcp.main")
-    logger.info(
-        "server.starting",
-        transport=transport,
-        host=bind_host,
-        port=settings.mcp_port,
-    )
-
-    if transport == "stdio":
-        await mcp.run_stdio_async()
-    elif transport == "streamable-http":
-        await mcp.run_http_async(
-            host=bind_host,
-            port=settings.mcp_port,
-            transport="streamable-http",
-        )
-    else:
-        raise typer.BadParameter(f"Unsupported transport: {transport!r}")
-
-
-# ── tools ─────────────────────────────────────────────────────────────────────
-
-
-@app.command(name="tools")
-def list_tools(
-    output: Optional[Path] = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Write the catalogue to a file (default: stdout)",
-    ),
-) -> None:
-    """Render the auto-generated tool catalogue from the live Shlink OpenAPI spec."""
-    from server import build_app
-    from shlink.tool_mapper import render_catalogue_markdown
-
-    async def _render() -> str:
-        settings = get_settings()
-        mcp = await build_app(settings)
-        return await render_catalogue_markdown(mcp)
-
-    markdown = asyncio.run(_render())
-    if output:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(markdown, encoding="utf-8", newline="\n")
-        typer.echo(f"wrote: {output}")
-    else:
-        typer.echo(markdown)
-
-
-# ── health ────────────────────────────────────────────────────────────────────
-
-
-@app.command()
-def health() -> None:
-    """Probe Shlink reachability and exit 0 (healthy) or 1 (unhealthy)."""
-    from shlink.client import build_shlink_client_from_settings
-
-    async def _probe() -> int:
-        settings = get_settings()
-        setup_logging(log_format="console", log_level="INFO")
-        logger = structlog.stdlib.get_logger("bg-shlink-mcp.health")
-        client = build_shlink_client_from_settings(settings)
-        try:
-            result = await client.health()
-            logger.info("health.ok", status=result.get("status"), shlink=result)
-            return 0
-        except Exception as exc:  # noqa: BLE001
-            logger.error("health.failed", error=str(exc))
-            return 1
-        finally:
-            await client.aclose()
-
-    raise typer.Exit(asyncio.run(_probe()))
-
-
-# ── entry ─────────────────────────────────────────────────────────────────────
-
 
 if __name__ == "__main__":
     app()

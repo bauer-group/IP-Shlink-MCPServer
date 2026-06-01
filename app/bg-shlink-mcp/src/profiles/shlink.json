@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bauer-group/LIB-BG-MCPCore/main/src/bg_mcpcore/profile/schema.json",
+  "id": "shlink",
+  "display_name": "BAUER GROUP Shlink",
+  "instructions": "Self-hosted Shlink URL shortener. Use these tools to create, list, edit, and analyse short links, manage tags and domains, and inspect visit analytics. The server talks to Shlink server-to-server with a single API key - your caller identity is authenticated via OAuth.",
+  "backend": {
+    "base_url": "${env:SHLINK_URL}",
+    "api_base_path": "/rest/v3"
+  },
+  "auth": {
+    "outbound": {
+      "type": "static_header",
+      "header": "X-Api-Key",
+      "value_from_env": "SHLINK_API_KEY"
+    }
+  },
+  "tools": [
+    {
+      "source": "openapi",
+      "spec": {
+        "source": "${env:SHLINK_OPENAPI_URL:-file:///app/openapi/shlink.json}"
+      },
+      "normalize": {
+        "strip_path_prefix": "/rest/v{version}"
+      },
+      "route_maps": [
+        { "pattern": "^/health$", "type": "resource" },
+        { "pattern": "^/mercure-info$", "type": "exclude" },
+        { "pattern": "^/rules", "type": "exclude" }
+      ],
+      "name_overrides": {
+        "POST /short-urls": "create_short_url",
+        "GET /short-urls": "list_short_urls",
+        "GET /short-urls/{shortCode}": "get_short_url",
+        "PATCH /short-urls/{shortCode}": "edit_short_url",
+        "DELETE /short-urls/{shortCode}": "delete_short_url",
+        "GET /short-urls/{shortCode}/redirect-rules": "get_redirect_rules",
+        "POST /short-urls/{shortCode}/redirect-rules": "set_redirect_rules",
+        "GET /short-urls/{shortCode}/visits": "get_short_url_visits",
+        "GET /tags/{tag}/visits": "get_tag_visits",
+        "GET /domains/{domain}/visits": "get_domain_visits",
+        "GET /visits/non-orphan": "get_non_orphan_visits",
+        "GET /visits/orphan": "get_orphan_visits",
+        "GET /visits": "get_visits_summary",
+        "GET /tags": "list_tags",
+        "GET /tags/stats": "get_tag_stats",
+        "PUT /tags": "rename_tag",
+        "DELETE /tags": "delete_tags",
+        "GET /domains": "list_domains",
+        "PATCH /domains/redirects": "set_domain_redirects"
+      },
+      "descriptions": {
+        "create_short_url": "Create a new short URL. Provide longUrl (required) and optionally customSlug, tags, domain, validSince, validUntil, maxVisits, title.",
+        "list_short_urls": "List short URLs, optionally filtered by search term, tags, or date range. Supports pagination via `page` and `itemsPerPage`.",
+        "get_short_url_visits": "Return paginated visit data for a single short URL. Filter by startDate, endDate, domain, excludeBots, or excludeRobots."
+      },
+      "annotations": "by_http_method"
+    },
+    {
+      "source": "python",
+      "register": "server:register_export_task"
+    }
+  ],
+  "extensions": {
+    "source": "${env:EXTENSIONS_CONFIG_PATH:-file:///app/extensions/extensions.json}",
+    "required": false
+  }
+}

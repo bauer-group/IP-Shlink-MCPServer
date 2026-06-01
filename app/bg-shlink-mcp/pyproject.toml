@@ -26,37 +26,26 @@ classifiers = [
     "Topic :: System :: Networking",
 ]
 dependencies = [
-    # MCP framework — auto-generates the tool surface from OpenAPI and ships
-    # the Entra / Google / OAuthProxy providers we depend on. 3.x replaced
-    # authlib.jose with joserfc and moved the OpenAPI provider to
-    # fastmcp.server.providers.openapi (handled in shlink/tool_mapper.py).
-    # The [tasks] extra pulls in docket for the long-running task execution
-    # mode — used by extensions/tasks.py for bulk exports.
-    "fastmcp[tasks]>=3.0.0,<4.0.0",
+    # Shared BAUER GROUP MCP framework — settings base, all five inbound auth
+    # modes (entra-single/-multi, google, oidc, none), encrypted OAuth-state
+    # storage, logging, rate limiting, routes, the outbound client + the
+    # profile/CLI surface. Pulled from GitHub (internal projects do not use PyPI
+    # for this package), pinned to a release tag for reproducibility. Extras:
+    #   [openapi]         - the OpenAPI tool source (the 25 Shlink REST tools)
+    #   [oauth-providers] - the Entra / Google inbound providers
+    #   [redis]           - the RedisStore backend for the OAuth-state store
+    #   [tasks]           - docket, for the export_short_urls long-running task
+    # bg-mcpcore transitively provides fastmcp / pydantic / pydantic-settings /
+    # httpx / structlog / rich / cryptography / typer / py-key-value-aio.
+    "bg-mcpcore[openapi,oauth-providers,redis,tasks] @ git+https://github.com/bauer-group/LIB-BG-MCPCore.git@v1.3.0",
 
-    # Async HTTP — used by FastMCP internally and by our Shlink client wrapper.
-    "httpx>=0.28.1,<1.0.0",
+    # Directly imported by this server's own code (kept explicit; also provided
+    # transitively by bg-mcpcore, so the version ranges stay compatible):
+    "fastmcp>=3.0.0,<4.0.0",        # TaskConfig + mcp.tool for the export task
+    "pydantic>=2.10.0,<3.0.0",      # Settings fields
+    "pydantic-settings>=2.14.1,<3.0.0",  # NoDecode on the CSV-list fields
 
-    # Type-safe environment-based configuration.
-    "pydantic>=2.10.0,<3.0.0",
-    "pydantic-settings>=2.14.1,<3.0.0",
-
-    # CLI surface: `serve`, `tools`, `health`.
-    "typer>=0.15.0,<1.0.0",
-
-    # Structured logging + pretty dev console.
-    "structlog>=24.4.0,<26.0.0",
-    "rich>=13.7.0,<15.0.0",
-
-    # OAuth client-state storage. Both branches of build_client_storage()
-    # need the underlying store class to import — DiskStore needs diskcache
-    # (the [disk] extra), RedisStore needs the redis client (the [redis]
-    # extra). FastMCP depends on py-key-value-aio with no extras, so we
-    # request both explicitly. + at-rest Fernet encryption.
-    "py-key-value-aio[disk,redis]>=0.4.4,<1.0.0",
-    "cryptography>=43.0.0,<49.0.0",
-
-    # Optional error tracking — loaded lazily, controlled by SENTRY_DSN.
+    # Optional error tracking — loaded lazily by bg-mcpcore, controlled by SENTRY_DSN.
     "sentry-sdk>=2.18.0,<3.0.0",
 ]
 
@@ -82,6 +71,11 @@ Issues = "https://github.com/bauer-group/IP-Shlink-MCPServer/issues"
 bg-shlink-mcp = "main:app"
 
 # ── Hatch build configuration ──────────────────────────────────────────────
+# bg-mcpcore is pulled via a direct git reference (GitHub, not PyPI); hatchling
+# requires this opt-in to allow a PEP 508 direct URL in project.dependencies.
+[tool.hatch.metadata]
+allow-direct-references = true
+
 # We ship a top-level package laid out under src/ - this points the wheel at it.
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
@@ -114,10 +108,11 @@ source = ["src"]
 omit = ["tests/*", "*/__init__.py"]
 
 [tool.coverage.report]
-# Global gate is conservative because CLI / server-lifespan / FastMCP wiring
-# is integration-tested, not unit-tested. The critical security-and-correctness
-# modules (config, auth, shlink.client, shlink.errors) sit comfortably above
-# 90% individually - check the per-module column when reviewing.
+# Global gate is conservative because CLI / server-lifespan / FastMCP wiring is
+# integration-tested, not unit-tested. The cross-cutting infra (auth, storage,
+# OpenAPI tool source, HTTP client + retry) is now tested once in bg-mcpcore's
+# own suite; this server's tests cover only the Shlink-specific seams (the
+# Settings subclass + the export task).
 fail_under = 60
 show_missing = true
 skip_covered = false

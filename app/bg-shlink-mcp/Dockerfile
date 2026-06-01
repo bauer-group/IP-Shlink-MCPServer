@@ -45,7 +45,9 @@ RUN python3 /usr/local/bin/bundle-openapi.py /spec/raw/swagger.json /spec/shlink
 # ── Stage 1b: Builder — install Python dependencies into a relocatable prefix ──
 FROM python:3.14-alpine AS builder
 
-RUN apk add --no-cache build-base libffi-dev
+# git is required to resolve the bg-mcpcore dependency, which is pulled from a
+# pinned GitHub tag (git+https://…@vX.Y.Z) rather than PyPI.
+RUN apk add --no-cache build-base libffi-dev git
 
 WORKDIR /build
 
@@ -61,7 +63,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ── Stage 2: Test — run pytest; image build fails on any test failure ────────
 FROM python:3.14-alpine AS test
 
-RUN apk add --no-cache build-base libffi-dev
+# git: the test stage installs bg-mcpcore from its GitHub tag too, so the exact
+# dependency exercised in CI is the one shipped in production.
+RUN apk add --no-cache build-base libffi-dev git
 
 WORKDIR /app
 
@@ -125,10 +129,10 @@ RUN rm /tmp/_test_passed
 WORKDIR /app
 COPY --chown=mcp:mcp src/ ./src/
 
-# Baked-in OpenAPI spec from the build-time fetch stage. config.py defaults
-# point at file:///app/openapi/shlink.json so the container starts without
-# any outbound network call. Override SHLINK_OPENAPI_URL at runtime to track
-# a live source instead.
+# Baked-in OpenAPI spec from the build-time fetch stage. The profile's spec
+# source defaults to file:///app/openapi/shlink.json (via
+# ${env:SHLINK_OPENAPI_URL:-…}) so the container starts without any outbound
+# network call. Override SHLINK_OPENAPI_URL at runtime to track a live source.
 COPY --from=spec --chown=mcp:mcp /spec/shlink.json /app/openapi/shlink.json
 
 # Operator-defined extensions catalogue — config-driven prompts, resource
@@ -172,6 +176,9 @@ CMD ["serve"]
 # -----------------------------------------------------------------------------
 # Usage
 # -----------------------------------------------------------------------------
-# Default (serve):        docker run ... bg-shlink-mcp
-# Health probe:           docker run ... bg-shlink-mcp health
-# Print tool catalogue:   docker run ... bg-shlink-mcp tools
+# Default (serve):    docker run ... bg-shlink-mcp
+# Liveness:           GET /healthz (unauthenticated; wired into HEALTHCHECK above)
+#
+# The server exposes only `serve` — there is no longer a `health` / `tools` CLI
+# subcommand. Liveness is the /healthz route; the tool catalogue is introspected
+# live via the MCP Inspector.
