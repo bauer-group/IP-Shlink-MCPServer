@@ -201,27 +201,12 @@ docker exec bg-shlink-mcp curl -fsS \
   ${SHLINK_URL}/rest/v3/short-urls?itemsPerPage=1
 ```
 
-### `ShlinkValidationError: longUrl ...`
+### Upstream validation error (`longUrl ...`)
 
-The LLM produced an invalid request body. The error detail is forwarded as-is.
-If recurring, tighten the tool description in
-`app/bg-shlink-mcp/src/shlink/tool_mapper.py` (`DESCRIPTION_OVERRIDES`).
-
-### Periodic spec-refresh warning
-
-```
-openapi.refresh_failed source=... error=...
-```
-
-You only see this if you've opted into runtime refresh (`SHLINK_OPENAPI_REFRESH_INTERVAL > 0`)
-AND set `SHLINK_OPENAPI_URL` to a remote source. The cached spec stays in
-place — tools keep working until the next successful fetch.
-
-The default deployment doesn't refresh at all: the spec is baked into the
-image at build time (`file:///app/openapi/shlink.json`), so there is no
-remote endpoint to be flaky. If you've turned on refresh and the warnings
-keep coming, switch back to the baked-in default (unset both env vars) or
-point at a stable in-house mirror.
+The LLM produced an invalid request body; Shlink replied 400 and FastMCP
+surfaces the detail to the client as-is. If recurring, tighten the tool
+description in the profile's `descriptions` map
+([profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json)).
 
 ### Wrong tool surface after a Shlink upgrade
 
@@ -238,12 +223,14 @@ Two fixes, pick the one that matches your update cadence:
    docker build --build-arg SHLINK_OPENAPI_VERSION=v5.1.0 -t bg-shlink-mcp .
    ```
 
-2. **Track upstream at runtime** (no rebuild needed):
+2. **Point at a different spec source** (no rebuild — picked up on restart):
 
    ```ini
    SHLINK_OPENAPI_URL=https://raw.githubusercontent.com/shlinkio/shlink/v5.1.0/docs/swagger/swagger.json
-   SHLINK_OPENAPI_REFRESH_INTERVAL=3600
    ```
+
+   The spec is loaded once at startup (bg-mcpcore does not poll for changes), so
+   restart the container after changing it.
 
 ---
 
@@ -280,22 +267,22 @@ LOG_FORMAT=console
 
 Rich-coloured output, useful locally. In prod keep `LOG_FORMAT=json`.
 
-### Probe Shlink from inside the container
+### Probe server liveness from inside the container
 
 ```bash
-docker exec bg-shlink-mcp python src/main.py health
+docker exec bg-shlink-mcp curl -fsS http://localhost:8000/healthz
 ```
 
-Exits 0 if Shlink replies on `/health`, 1 otherwise.
+Returns `{"status": "ok"}` once the MCP server is up — the unauthenticated
+`/healthz` route wired into the Docker HEALTHCHECK. (The former `health` CLI
+subcommand was removed in the bg-mcpcore migration; for upstream Shlink
+reachability, check the server logs or call a read-only tool via the Inspector.)
 
 ### Inspect the live tool catalogue
 
-```bash
-docker exec bg-shlink-mcp python src/main.py tools
-```
-
-Prints the markdown catalogue to stdout — same content as `docs/tools.md`.
-Useful to confirm which tools your Shlink version exposes.
+Browse the tool list through the MCP Inspector (`tools/list`) — see
+[testing.md](./testing.md). The former `tools` CLI subcommand was removed in the
+bg-mcpcore migration.
 
 ### Sentry
 

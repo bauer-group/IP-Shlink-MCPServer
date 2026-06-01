@@ -199,9 +199,8 @@ allowlist. Rejected requests are logged as `auth.tenant_denied`
 > that logs `auth.tenant_denied_audit_only_passing_through` *without* blocking
 > the request — useful when introducing the allowlist on an existing
 > deployment so you can confirm which tenants are calling before flipping
-> to enforcement. The mode is controlled in code (`TenantAllowlistMiddleware`
-> in `app/bg-shlink-mcp/src/auth/middleware.py`), not via env var, to keep
-> the policy explicit and reviewable.
+> to enforcement. It is bg-mcpcore's `TenantAllowlistMiddleware`, wired
+> automatically for `AUTH_MODE=entra-multi` when `ENTRA_ALLOWED_TENANTS` is set.
 
 ---
 

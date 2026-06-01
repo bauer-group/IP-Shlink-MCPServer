@@ -1,41 +1,39 @@
 # Shlink MCP Server
 
-OIDC-gated remote MCP bridge for self-hosted Shlink. See the
-[repository README](../../README.md) and
+OAuth-gated remote MCP bridge for self-hosted Shlink, built on the shared
+**bg-mcpcore** framework. See the [repository README](../../README.md) and
 [docs/](../../docs/) for installation, authentication setup, and
 client-connection instructions.
 
 ## Internal Architecture
 
+This server is almost entirely declarative. The cross-cutting infrastructure —
+the five inbound auth providers (Entra single/multi, Google, generic OIDC,
+none), encrypted OAuth-state storage, rate limiting, structured logging, the
+OpenAPI→tools source, the HTTP client + retry, and the `/healthz` · `/` ·
+`/logo.svg` routes — lives in **bg-mcpcore** (a pinned GitHub dependency), tested
+once there. This repo keeps only the Shlink-specific seams:
+
 ```text
 src/
-  config.py              Pydantic-Settings model + AUTH_MODE validation
-  logging_setup.py       structlog + Rich (console / json modes)
-  server.py              FastMCP construction + lifespan + middleware wiring
-  main.py                Typer CLI (serve / tools / health)
-  rate_limit.py          Token-bucket limiter, OAuth-subject / proxy-aware IP keyed
-  auth/
-    provider_factory.py  AUTH_MODE -> concrete provider
-    entra.py             Microsoft Entra (single + multi tenant)
-    google.py            Google Workspace
-    generic_oidc.py      Authentik / Keycloak / Zitadel / Auth0 / Okta / ...
-    middleware.py        Tenant allowlist for entra-multi (enforce / audit-only)
-    client_storage.py    Encrypted OAuth state store (Redis or disk fallback)
-  extensions/
-    loader.py            Reads extensions.json, registers prompts/resources/tasks
-    config.py            Operator-config schema + validators
-    prompts.py           Slash-command-like workflows
-    resources.py         Static + templated MCP resources
-    tasks.py             Long-running export tasks (poll for completion)
-  shlink/
-    client.py            Async httpx wrapper (X-Api-Key, retries, error mapping)
-    errors.py            Typed exception hierarchy mapped from problem+json
-    openapi_loader.py    Cached spec fetch + background refresh
-    tool_mapper.py       FastMCP.from_openapi() route maps + name overrides
+  config.py            Settings(BaseMcpSettings): the shlink_* backend +
+                       Entra/Google credential fields + per-mode auth validation
+  server.py            the bulk-export task (the profile's `python` tool source)
+  main.py              make_cli() entrypoint (serve)
+  profiles/
+    shlink.json        declarative profile: backend, the static X-Api-Key
+                       outbound resolver, the OpenAPI tool source (route maps /
+                       name + description overrides / annotations), the prompt +
+                       resource extensions, and the python export source
   static/
-    index.html           Landing page served at /
-    logo.svg             Consent-screen brand asset served at /logo.svg
+    index.html         Landing page served at /
+    logo.svg           Consent-screen brand asset served at /logo.svg
+extensions/
+  extensions.json      operator-defined prompts + resources (loaded by bg-mcpcore)
 ```
+
+Inbound auth is env-driven (`AUTH_MODE`) and resolved by bg-mcpcore's built-in
+providers — there is no auth code in this repo.
 
 Two trust boundaries that never mix:
 

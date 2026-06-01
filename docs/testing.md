@@ -304,8 +304,8 @@ diagnosing a stuck flow.
 
 ### 3.3 · What to verify after connecting
 
-- The **tool count** matches what `python src/main.py tools` produces in
-  the container (the catalogue is auto-derived from Shlink's OpenAPI).
+- The **tool count** is 26 (25 auto-derived from Shlink's OpenAPI spec +
+  the `export_short_urls` task).
 - A **read-only call** (`list_short_urls`, `get_visits`) succeeds.
 - A **write call** (`create_short_url`) succeeds *and* the new code is
   visible in the Shlink web UI — confirms both directions of the data
@@ -372,48 +372,50 @@ HTTP transport or OAuth** — for those, use Scenarios 1 or 3.
 > that one only works with servers built on `mcp.server.Server`, not
 > FastMCP 2.x.
 
-### In-container CLI subcommands
+### In-container CLI + liveness
 
-The container ships three Typer subcommands —
-see [main.py:106-156](../app/bg-shlink-mcp/src/main.py#L106-L156):
+The container ships a single Typer command, `serve` (the default). Liveness is
+the unauthenticated `/healthz` route — wired into the Docker HEALTHCHECK — not a
+CLI subcommand:
 
 ```bash
-# Live tool catalogue — same content as docs/tools.md
-docker exec bg-shlink-mcp python src/main.py tools
+# Liveness probe (200 + {"status":"ok"} once the server is up)
+docker exec bg-shlink-mcp curl -fsS http://localhost:8000/healthz
 
-# Shlink reachability probe — exits 0 (healthy) or 1
-docker exec bg-shlink-mcp python src/main.py health
-
-# Run the pytest suite (116 tests, also gates the Docker build)
+# Run the pytest suite (also gates the Docker build)
 docker exec bg-shlink-mcp pytest -q
 ```
 
+> The former `tools` / `health` subcommands were removed in the bg-mcpcore
+> migration. Browse the live tool catalogue through the MCP Inspector
+> (`tools/list`); liveness is `/healthz`.
+
 ### `pytest` with FastMCP's in-memory `Client`
 
-For unit-testing tool logic without any process, network, or Inspector:
+For exercising the assembled server without any process, network, or Inspector,
+build it from the profile and open an in-memory transport. Point
+`SHLINK_OPENAPI_URL` at a local spec so no network call is needed:
 
 ```python
-import pytest
+import os
 from fastmcp import Client
-from server import build_app
+from bg_mcpcore import build_app_from_profile, load_profile
 from config import Settings
 
-@pytest.mark.asyncio
 async def test_list_short_urls_returns_results():
-    settings = Settings(...)              # test fixture; see tests/conftest.py
-    mcp = await build_app(settings)
+    os.environ["SHLINK_OPENAPI_URL"] = "file:///path/to/shlink.json"
+    profile = load_profile("src/profiles/shlink.json")
+    mcp = await build_app_from_profile(profile, Settings())
 
-    # Client(<server>) opens an in-memory transport — no sockets, no JSON wire
+    # Client(<server>) opens an in-memory transport — no sockets, no JSON wire.
     async with Client(mcp) as client:
-        result = await client.call_tool(
-            "list_short_urls",
-            {"itemsPerPage": 5},
-        )
+        result = await client.call_tool("list_short_urls", {"itemsPerPage": 5})
         assert "shortUrls" in result.data
 ```
 
-The Shlink HTTP client should be patched with `respx` or `pytest-httpx` —
-see the existing patterns under [tests/](../app/bg-shlink-mcp/tests/).
+For unit tests of the Shlink-specific seams (the Settings subclass, the export
+task) without building the whole app, see the patterns under
+[tests/](../app/bg-shlink-mcp/tests/) — the upstream calls are stubbed there.
 
 ### Direct JSON-RPC with `curl` / `httpie`
 
@@ -508,8 +510,7 @@ a fresh OAuth round trip.
 | Inspector against local source checkout (stdio) | `npx @modelcontextprotocol/inspector python src/main.py serve --transport stdio` |
 | Same as above, FastMCP sugar | `fastmcp dev src/main.py` |
 | Headless CI smoke test | `npx @modelcontextprotocol/inspector --cli <url> --method tools/list` |
-| Container tool catalogue | `docker exec bg-shlink-mcp python src/main.py tools` |
-| Container Shlink probe | `docker exec bg-shlink-mcp python src/main.py health` |
+| Container liveness probe | `docker exec bg-shlink-mcp curl -fsS http://localhost:8000/healthz` |
 | Container test suite | `docker exec bg-shlink-mcp pytest -q` |
 | Unit test with in-memory transport | `from fastmcp import Client; async with Client(mcp) as c: ...` |
 | Public unauth-surface sanity (curl) | `curl -fsS $HOST/.well-known/oauth-protected-resource \| jq .` |

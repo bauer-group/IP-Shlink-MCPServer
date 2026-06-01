@@ -1,9 +1,13 @@
 # Vision: From Shlink-MCP to a Generic OpenAPI → MCP Bridge
 
-> **Status:** architectural sketch, not committed scope. Captures the design
-> space, trade-offs, and an incremental path so we can decide *if* and *how*
-> to generalise the current single-tenant `bg-shlink-mcp` into a multi-API
-> framework. Read this before adding ad-hoc support for a second upstream.
+> **Status: REALIZED.** This vision has been implemented. The generic
+> OpenAPI→MCP bridge described here is the shared **bg-mcpcore** framework, and
+> `bg-shlink-mcp` was migrated onto it — the server is now a declarative profile
+> ([`src/profiles/shlink.json`](../app/bg-shlink-mcp/src/profiles/shlink.json))
+> plus one Shlink-specific seam (the bulk-export task). This document is kept as
+> the design rationale; the **"Where we stand today" snapshot below describes the
+> *pre-migration* internals** — the `src/shlink/*` and `src/auth/*` modules it
+> names no longer exist in this repo (they live in bg-mcpcore now).
 
 ---
 

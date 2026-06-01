@@ -140,33 +140,22 @@ IP-Shlink-MCPServer/
 │       ├── pyproject.toml           ← PEP 621 deps (no requirements.txt)
 │       ├── README.md                ← internal architecture
 │       ├── src/                     ← Python package (PYTHONPATH=/app/src)
-│       │   ├── main.py              ← Typer CLI (serve / tools / health)
-│       │   ├── config.py            ← Pydantic Settings + AUTH_MODE validation
-│       │   ├── server.py            ← FastMCP construction + lifespan
-│       │   ├── rate_limit.py        ← Token-bucket limiter (sub/IP keyed)
-│       │   ├── logging_setup.py     ← structlog + Rich
-│       │   ├── auth/
-│       │   │   ├── provider_factory.py
-│       │   │   ├── entra.py
-│       │   │   ├── google.py
-│       │   │   ├── generic_oidc.py
-│       │   │   ├── middleware.py    ← Tenant allowlist (entra-multi)
-│       │   │   └── client_storage.py← Encrypted Redis/disk OAuth store
-│       │   ├── extensions/          ← Operator-defined prompts/resources/tasks
-│       │   │   ├── loader.py
-│       │   │   ├── config.py
-│       │   │   ├── prompts.py
-│       │   │   ├── resources.py
-│       │   │   └── tasks.py
-│       │   ├── shlink/
-│       │   │   ├── client.py
-│       │   │   ├── errors.py
-│       │   │   ├── openapi_loader.py
-│       │   │   └── tool_mapper.py
+│       │   ├── main.py              ← make_cli() entrypoint (serve)
+│       │   ├── config.py            ← Settings(BaseMcpSettings): backend + per-mode auth validation
+│       │   ├── server.py            ← the bulk-export task (the profile's python tool source)
+│       │   ├── profiles/
+│       │   │   └── shlink.json      ← declarative profile: backend, auth, OpenAPI tools, extensions
 │       │   └── static/
 │       │       ├── index.html       ← landing page served at /
 │       │       └── logo.svg         ← consent-screen brand asset (/logo.svg)
-│       └── tests/                   ← pytest (116 tests, gates Docker build)
+│       └── tests/                   ← pytest (Shlink-specific seams; gates Docker build)
+│
+│   The cross-cutting infrastructure — all five inbound auth providers,
+│   encrypted OAuth-state storage, rate limiting, structured logging, the
+│   OpenAPI→tools source, the HTTP client + retry, the /healthz · / · /logo.svg
+│   routes — lives in the shared bg-mcpcore framework (a pinned GitHub
+│   dependency), not in this repo. This server is the profile plus the one
+│   Shlink-specific seam (the bulk-export task).
 │
 ├── docs/
 │   ├── SHLINK-MCP-SPEC.md           ← source spec
@@ -174,7 +163,6 @@ IP-Shlink-MCPServer/
 │   ├── authentication.md
 │   ├── client-setup.md
 │   ├── testing.md                   ← Inspector workflows (local + remote)
-│   ├── tools.md                     ← CI-generated tool catalogue
 │   └── troubleshooting.md
 │
 └── .github/
@@ -207,8 +195,7 @@ IP-Shlink-MCPServer/
 - [docs/authentication.md](docs/authentication.md) — full walkthroughs for Entra (single/multi), Google, generic OIDC
 - [docs/client-setup.md](docs/client-setup.md) — adding the connector in each AI client
 - [docs/testing.md](docs/testing.md) — local & remote testing with MCP Inspector (GUI + CLI)
-- [docs/tools.md](docs/tools.md) — auto-generated catalogue of MCP tools
-- [docs/mcp-primitives.md](docs/mcp-primitives.md) — implementation guide for all 11 MCP Inspector tabs (Tools, Resources, Prompts, Tasks, Apps, Sampling, Elicitations, Roots, Auth, Metadata, Ping)
+- [docs/mcp-primitives.md](docs/mcp-primitives.md) — implementation guide for all 11 MCP Inspector tabs (Tools, Resources, Prompts, Tasks, Apps, Sampling, Elicitations, Roots, Auth, Metadata, Ping); the live tool catalogue is browsable via the Inspector's `tools/list`
 - [docs/troubleshooting.md](docs/troubleshooting.md) — common errors & fixes
 - [docs/SHLINK-MCP-SPEC.md](docs/SHLINK-MCP-SPEC.md) — design specification (source of truth)
 

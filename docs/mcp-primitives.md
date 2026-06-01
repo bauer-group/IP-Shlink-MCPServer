@@ -99,17 +99,18 @@ async def list_short_urls(...) -> dict:
 
 **Implemented — 25 tools, auto-generated from Shlink's OpenAPI.**
 
-We do not hand-write tool functions. `FastMCP.from_openapi()` walks the
-spec and registers every operation as a tool — see
-[tool_mapper.py:298-340](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L298-L340).
-The same module applies four post-processing passes:
+We do not hand-write tool functions. bg-mcpcore's OpenAPI tool source calls
+`FastMCP.from_openapi()` to walk the spec and register every operation as a
+tool, configured declaratively by the `tools` block in
+[profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json). The same
+source applies four post-processing passes, all driven from that profile:
 
-| Pass | What it does | Where |
+| Pass | What it does | Profile key |
 | --- | --- | --- |
-| `_normalize_spec_for_v3` | Strips `/rest/v{version}` from paths and drops the `version` path-param so the LLM never sees it | [tool_mapper.py:140-183](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L140-L183) |
-| `SHLINK_ROUTE_MAPS` | Filters routes — `/mercure-info` excluded, `/health` becomes a Resource | [tool_mapper.py:56-69](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L56-L69) |
-| `NAME_OVERRIDES` | Maps PascalCase `operationId`s to snake_case (`createShortUrl` → `create_short_url`) | [tool_mapper.py:77-106](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L77-L106) |
-| `METHOD_ANNOTATIONS` | Per-HTTP-method safety hints applied via `mcp_component_fn` | [tool_mapper.py:44-50](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L44-L50) |
+| spec normalisation | Strips `/rest/v{version}` from paths and drops the `version` path-param so the LLM never sees it | `normalize.strip_path_prefix` |
+| route maps | Filters routes — `/mercure-info` excluded, `/health` becomes a Resource | `route_maps` |
+| name overrides | Maps `operationId`s to snake_case (`createShortUrl` → `create_short_url`) | `name_overrides` |
+| annotations | Per-HTTP-method safety hints applied via the component hook | `annotations: by_http_method` |
 
 ### Pitfalls
 
@@ -117,9 +118,9 @@ The same module applies four post-processing passes:
   `destructiveHint`. Treat them as defence-in-depth; keep the Shlink API key
   on a need-to-know basis regardless.
 - **A "useful description" doubles the AI's hit rate.** Shlink's spec
-  summaries are sometimes uninformative ("List short URLs"). Hand-written
-  `DESCRIPTION_OVERRIDES` ([tool_mapper.py:111-124](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L111-L124))
-  exist for exactly this reason on the three most-used tools.
+  summaries are sometimes uninformative ("List short URLs"). The profile's
+  `descriptions` map ([profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json))
+  overrides them for exactly this reason on the three most-used tools.
 - **GET-as-Tool is a mild smell.** ~10 of our 25 tools are pure reads. They
   work as tools, but a Resource Template would be cheaper in tokens and
   semantically more honest. See §3.
@@ -160,10 +161,9 @@ The function name doesn't matter; the **URI** is the public identifier.
 
 ### Status in `bg-shlink-mcp`
 
-**Implemented (4 static resources).** Config-driven via
+**Implemented (5 static resources + 5 templates).** Config-driven via
 [`extensions/extensions.json`](../app/bg-shlink-mcp/extensions/extensions.json),
-loaded by [`src/extensions/resources.py`](../app/bg-shlink-mcp/src/extensions/resources.py).
-Current catalogue:
+loaded by bg-mcpcore's extensions subsystem. Current catalogue:
 
 | URI | Backend GET |
 | --- | --- |
@@ -232,11 +232,10 @@ keep using the tool; clients/users that prefer pin-able URIs get the template.
 | `shlink://tag/{tag}/visits` | `/tags/{tag}/visits` |
 | `shlink://domain/{domain}/visits` | `/domains/{domain}/visits` |
 
-Validation guards against drift: the
-[`ResourceConfig._placeholders_match`](../app/bg-shlink-mcp/src/extensions/config.py)
-validator rejects any config where the URI placeholders and the backend-path
-placeholders don't line up — so a `{shortCode}` in the URI without a
-matching `{shortCode}` in the backend path fails at boot.
+Validation guards against drift: bg-mcpcore's `ResourceConfig` validator
+rejects any config where the URI placeholders and the backend-path placeholders
+don't line up — so a `{shortCode}` in the URI without a matching `{shortCode}`
+in the backend path fails at boot.
 
 ### Pitfalls
 
@@ -292,7 +291,7 @@ Prompts can also return structured `PromptMessage` lists with role
 
 **Implemented (1 prompt — `top_visits_report`).** Config-driven via
 [`extensions/extensions.json`](../app/bg-shlink-mcp/extensions/extensions.json),
-registered by [`src/extensions/prompts.py`](../app/bg-shlink-mcp/src/extensions/prompts.py).
+registered by bg-mcpcore's extensions subsystem.
 
 `top_visits_report(limit=20, days=30, exclude_bots=true)` orchestrates
 `list_short_urls` → `get_short_url_visits` (per URL) → ranked markdown
@@ -417,26 +416,21 @@ the AI.
 ### Status in `bg-shlink-mcp`
 
 **Implemented (1 task — `export_short_urls`).** Bulk-exports the full
-short-URL inventory as CSV or JSON. Config-driven via
-[`extensions/extensions.json`](../app/bg-shlink-mcp/extensions/extensions.json);
-the Python logic lives in [`src/extensions/tasks.py`](../app/bg-shlink-mcp/src/extensions/tasks.py)
-as an abstract `Exporter` base with `ShortUrlExporter` as the first
-concrete subclass.
+short-URL inventory as CSV or JSON. The procedural logic (pagination +
+CSV/JSON rendering) lives in [`src/server.py`](../app/bg-shlink-mcp/src/server.py)
+as the profile's `python` tool source (registered via `server:register_export_task`)
+and runs as an MCP task through `ctx.request`.
 
-**Why config-driven *registration* + class-based *execution*:** the
-operator decides whether the export exists, which formats are allowed,
-and how the task runs (`mode`, `poll_interval`, `ttl`) — JSON is the
-right tool. But pagination + CSV/JSON formatting is procedural Python
-that doesn't compress into config without ugly DSLs. The split keeps
-each layer working in its native medium.
+**Why a python source and not an extension:** bg-mcpcore's extensions cover
+prompts + resources (pure transformations of config), but a task has procedural
+logic (pagination, format conversion) that doesn't compress into config without
+ugly DSLs. The profile still controls *which* sources exist; the *how it runs*
+is code. (Pre-migration this was a config-driven `Exporter` class in
+`extensions/tasks.py`; the export behaviour is byte-for-byte unchanged.)
 
-Adding a new exporter (e.g. tags, domains as CSV):
-
-1. Subclass `Exporter` in `tasks.py`, implement `fetch_all()`
-2. Register it in `_EXPORTERS = {"my_key": MyExporter, ...}`
-3. Reference it from `extensions.json` with `"exporter": "my_key"`
-
-No other code-path touches required.
+Adding a new export (e.g. tags, domains as CSV): add a `_fetch_all_*` helper +
+a second `register_*_task` in `server.py`, and reference it as another `python`
+tool source in the profile. No other code-path touches required.
 
 Further candidates:
 
@@ -764,9 +758,9 @@ async def create_short_url(...): ...
 
 | Field | Usage |
 | --- | --- |
-| `annotations` | All 25 tools, via `METHOD_ANNOTATIONS` ([tool_mapper.py:44-50](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L44-L50)) |
-| `tags` | `{"shlink"}` on all generated tools ([tool_mapper.py:325](../app/bg-shlink-mcp/src/shlink/tool_mapper.py#L325)) |
-| `description` | Spec-derived + 3 manual overrides |
+| `annotations` | All 25 OpenAPI tools, via the profile's `annotations: by_http_method` (bg-mcpcore applies the per-HTTP-method hints) |
+| `tags` | Spec-derived (from each operation's OpenAPI `tags`). The pre-migration uniform `{"shlink"}` tag is no longer applied — it was redundant metadata on a single-purpose server |
+| `description` | Spec-derived + 3 overrides from the profile's `descriptions` map |
 | `version` | Not set per-tool (the server has one image version; tools inherit) |
 | `icons` | Not set |
 | `_meta` | Not set |
@@ -788,10 +782,10 @@ async def create_short_url(...): ...
 
 All operator-defined prompts, resources, and tasks live in one JSON file
 baked into the image at `/app/extensions/extensions.json` (override via
-`EXTENSIONS_CONFIG_PATH`). The Pydantic models in
-[`src/extensions/config.py`](../app/bg-shlink-mcp/src/extensions/config.py)
-are the source of truth — they enforce `extra=forbid`, so typos in keys
-fail at boot rather than silently dropping an entry.
+`EXTENSIONS_CONFIG_PATH`). bg-mcpcore's extensions Pydantic models are the
+source of truth — they enforce `extra=forbid`, so typos in keys fail at boot
+rather than silently dropping an entry. (Note: bg-mcpcore extensions cover
+prompts + resources only; the export task is a `python` tool source — see §4.)
 
 ### Top-level shape
 
@@ -911,10 +905,10 @@ Sorted by value-to-effort ratio. Updated as features land.
 - **More prompts.** `audit_short_url(shortCode)`, `tag_cleanup`,
   `migrate_long_urls(from_domain, to_domain)`. Each is a JSON edit; no
   Python required.
-- **Resource for health.** Either a JSON entry pointing at `/rest/health`
-  (the spec's real path, not `/rest/v{version}/health`) or a hand-written
-  `@mcp.resource("shlink://health")` that calls `ShlinkClient.health()`
-  directly.
+- **Resource for health.** Add a resource entry to `extensions.json`
+  (`uri: "shlink://health"`, `backend.method: GET`, `backend.path: /health`) so
+  the catalogue exposes upstream health as a read-only resource — a JSON edit,
+  no Python required.
 
 ### Soon (clear value, more design surface)
 
@@ -986,8 +980,8 @@ Sorted by value-to-effort ratio. Updated as features land.
   of the above
 - [docs/troubleshooting.md](troubleshooting.md) — what to do when a
   primitive doesn't behave
-- [tool_mapper.py](../app/bg-shlink-mcp/src/shlink/tool_mapper.py) —
-  the actual Tools/Resources wiring
+- [profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json) —
+  the declarative Tools/Resources/auth wiring (executed by bg-mcpcore)
 - [MCP specification](https://spec.modelcontextprotocol.io) — protocol
   source of truth
 - [FastMCP 3.x docs](https://gofastmcp.com) — Python API reference
