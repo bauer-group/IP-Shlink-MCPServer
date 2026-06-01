@@ -1,3 +1,13 @@
+## [0.12.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.2...v0.12.3) (2026-06-01)
+
+### 🐛 Bug Fixes
+
+* removed dead branch in Shlink error problem-type resolution ([c9f5511](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/c9f551179ff8c498eca65d5d38bdee751a9dd267))
+
+### ♻️ Refactoring
+
+* **shlink:** migrated server to the bg-mcpcore framework ([5eb6799](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/5eb6799269008e6f1fd44b7e2cc90da0ae7bb96e))
+
 ## [0.12.2](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.1...v0.12.2) (2026-05-27)
 
 ## [0.12.1](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.0...v0.12.1) (2026-05-18)
