@@ -106,7 +106,7 @@ LABEL org.opencontainers.image.documentation="https://github.com/bauer-group/IP-
 LABEL org.opencontainers.image.description="bg-shlink-mcp — OIDC-gated remote MCP for self-hosted Shlink (BAUER GROUP)"
 LABEL com.bauer-group.image.component="mcp-server"
 LABEL com.bauer-group.image.stack="shlink"
-LABEL org.opencontainers.image.version="0.12.2"
+LABEL org.opencontainers.image.version="0.12.3"
 
 RUN apk add --no-cache \
         tini \
