@@ -7,24 +7,25 @@ client-connection instructions.
 
 ## Internal Architecture
 
-This server is almost entirely declarative. The cross-cutting infrastructure —
-the five inbound auth providers (Entra single/multi, Google, generic OIDC,
-none), encrypted OAuth-state storage, rate limiting, structured logging, the
-OpenAPI→tools source, the HTTP client + retry, and the `/healthz` · `/` ·
-`/logo.svg` routes — lives in **bg-mcpcore** (a pinned GitHub dependency), tested
-once there. This repo keeps only the Shlink-specific seams:
+This server is **fully declarative — no tool code at all**. The cross-cutting
+infrastructure — the five inbound auth providers (Entra single/multi, Google,
+generic OIDC, none), encrypted OAuth-state storage, rate limiting, structured
+logging, the OpenAPI→tools source, the `export` task source, the HTTP client +
+retry, and the `/healthz` · `/` · `/logo.svg` routes — lives in **bg-mcpcore**
+(a pinned GitHub dependency), tested once there. This repo keeps only the
+Shlink-specific settings + the profile:
 
 ```text
 src/
   config.py            Settings(BaseMcpSettings): the shlink_* backend +
                        Entra/Google credential fields + per-mode auth validation
-  server.py            the bulk-export task (the profile's `python` tool source)
   main.py              make_cli() entrypoint (serve)
   profiles/
     shlink.json        declarative profile: backend, the static X-Api-Key
                        outbound resolver, the OpenAPI tool source (route maps /
-                       name + description overrides / annotations), the prompt +
-                       resource extensions, and the python export source
+                       name + description overrides / annotations), the
+                       `export_short_urls` export source, and the prompt +
+                       resource extensions
   static/
     index.html         Landing page served at /
     logo.svg           Consent-screen brand asset served at /logo.svg
@@ -33,7 +34,7 @@ extensions/
 ```
 
 Inbound auth is env-driven (`AUTH_MODE`) and resolved by bg-mcpcore's built-in
-providers — there is no auth code in this repo.
+providers — there is no auth or tool code in this repo.
 
 Two trust boundaries that never mix:
 

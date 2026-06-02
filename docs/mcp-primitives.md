@@ -415,22 +415,23 @@ the AI.
 
 ### Status in `bg-shlink-mcp`
 
-**Implemented (1 task — `export_short_urls`).** Bulk-exports the full
-short-URL inventory as CSV or JSON. The procedural logic (pagination +
-CSV/JSON rendering) lives in [`src/server.py`](../app/bg-shlink-mcp/src/server.py)
-as the profile's `python` tool source (registered via `server:register_export_task`)
-and runs as an MCP task through `ctx.request`.
+**Implemented (1 task — `export_short_urls`).** Bulk-exports the full short-URL
+inventory as CSV or JSON, fully declaratively via bg-mcpcore's `export` tool
+source ([`profiles/shlink.json`](../app/bg-shlink-mcp/src/profiles/shlink.json)):
+the endpoint, the `items_path`, the page params + counters, the formats, and the
+task mode are config. The pagination + CSV/JSON rendering live in bg-mcpcore and
+run as an MCP task through the upstream client.
 
-**Why a python source and not an extension:** bg-mcpcore's extensions cover
-prompts + resources (pure transformations of config), but a task has procedural
-logic (pagination, format conversion) that doesn't compress into config without
-ugly DSLs. The profile still controls *which* sources exist; the *how it runs*
-is code. (Pre-migration this was a config-driven `Exporter` class in
-`extensions/tasks.py`; the export behaviour is byte-for-byte unchanged.)
+**Why a tool source and not an extension:** bg-mcpcore's extensions cover prompts
++ resources (pure transformations of config), but a task has procedural logic
+(pagination, format conversion) — so it is a *tool source* (`export`), not an
+extension. The profile still controls *which* exports exist and *how they run*;
+the procedure is the framework's. (This was hand-written Python before adopting
+bg-mcpcore's `export` source; the export behaviour is byte-for-byte unchanged.)
 
-Adding a new export (e.g. tags, domains as CSV): add a `_fetch_all_*` helper +
-a second `register_*_task` in `server.py`, and reference it as another `python`
-tool source in the profile. No other code-path touches required.
+Adding a new export (e.g. tags, domains as CSV): add a second `export` tool
+source to the `tools` list in the profile with its own `endpoint` / `items_path`.
+No code required.
 
 Further candidates:
 
@@ -477,10 +478,9 @@ handles it; observability lives in the server's request logs.
 
 ### Status in `bg-shlink-mcp`
 
-**Automatic.** Streamable-HTTP transport handles it. Our
-[`/healthz`](../app/bg-shlink-mcp/src/server.py) endpoint is a separate,
-HTTP-level liveness probe used by Docker `HEALTHCHECK` — **not** the same
-as MCP ping. Don't confuse them:
+**Automatic.** Streamable-HTTP transport handles it. The `/healthz` endpoint
+(served by bg-mcpcore's routes) is a separate, HTTP-level liveness probe used by
+Docker `HEALTHCHECK` — **not** the same as MCP ping. Don't confuse them:
 
 | Endpoint | Audience | Behaviour |
 | --- | --- | --- |
@@ -670,7 +670,7 @@ Two independent layers:
 ### FastMCP API
 
 ```python
-# Transport layer (in server.py)
+# Transport layer — bg-mcpcore wires this from the profile's inbound AUTH_MODE
 from fastmcp.server.auth import AzureProvider
 mcp = FastMCP(name="…", auth=AzureProvider(...))
 

@@ -142,9 +142,8 @@ IP-Shlink-MCPServer/
 │       ├── src/                     ← Python package (PYTHONPATH=/app/src)
 │       │   ├── main.py              ← make_cli() entrypoint (serve)
 │       │   ├── config.py            ← Settings(BaseMcpSettings): backend + per-mode auth validation
-│       │   ├── server.py            ← the bulk-export task (the profile's python tool source)
 │       │   ├── profiles/
-│       │   │   └── shlink.json      ← declarative profile: backend, auth, OpenAPI tools, extensions
+│       │   │   └── shlink.json      ← declarative profile: backend, auth, OpenAPI tools, export, extensions
 │       │   └── static/
 │       │       ├── index.html       ← landing page served at /
 │       │       └── logo.svg         ← consent-screen brand asset (/logo.svg)
