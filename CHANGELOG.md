@@ -1,3 +1,9 @@
+## [0.12.4](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.3...v0.12.4) (2026-06-02)
+
+### ♻️ Refactoring
+
+* **shlink:** replaced the export Python with the declarative export source ([4382926](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/4382926a8b22702ee089c0a02fdb53bde5808a47))
+
 ## [0.12.3](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.2...v0.12.3) (2026-06-01)
 
 ### 🐛 Bug Fixes
