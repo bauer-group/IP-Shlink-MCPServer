@@ -1,11 +1,16 @@
 """bg-shlink-mcp — CLI entrypoint.
 
-A thin, profile-driven bg-mcpcore server: the declarative profile
-(``profiles/shlink.json``) plus the one Shlink-specific seam in ``server.py``
-(the bulk-export task). ``make_cli`` builds the Typer ``serve`` command, applies
-the dual-stack socket patch, and assembles the FastMCP instance from the profile
-+ settings. The 25 OpenAPI tools, the prompt + resource catalogue, all five
-inbound auth modes, and the static X-Api-Key outbound auth are pure config.
+A fully declarative, profile-driven bg-mcpcore server — no tool code at all.
+Everything lives in ``profiles/shlink.json``: the 25 OpenAPI tools, the
+``export_short_urls`` bulk-export task (the ``export`` tool source), the prompt +
+resource catalogue, all five inbound auth modes, and the static X-Api-Key
+outbound auth. ``make_cli`` builds the Typer ``serve`` command, applies the
+dual-stack socket patch, and assembles the FastMCP instance from the profile +
+settings. ``config.py`` adds only the typed settings (backend + per-mode auth
+validation).
+
+Container liveness: hit the unauthenticated ``/healthz`` route (served by the
+framework) — there is no longer a ``health`` / ``tools`` CLI subcommand.
 
 Container liveness: hit the unauthenticated ``/healthz`` route (served by the
 framework) — there is no longer a ``health`` / ``tools`` CLI subcommand.

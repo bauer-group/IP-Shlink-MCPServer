@@ -57,8 +57,20 @@
       "annotations": "by_http_method"
     },
     {
-      "source": "python",
-      "register": "server:register_export_task"
+      "source": "export",
+      "name": "export_short_urls",
+      "title": "Export Short URLs",
+      "description": "Bulk-export every short URL on this Shlink instance as CSV or JSON. Runs as an MCP task — the AI receives a task_id and polls until completion. Pages through the entire inventory; large instances may take a few seconds.",
+      "tags": ["export", "bulk"],
+      "endpoint": "/short-urls",
+      "items_path": "shortUrls.data",
+      "page_param": "page",
+      "page_size_param": "itemsPerPage",
+      "page_size": 200,
+      "current_page_path": "shortUrls.pagination.currentPage",
+      "total_pages_path": "shortUrls.pagination.pagesCount",
+      "formats": ["csv", "json"],
+      "task": { "mode": "required", "poll_interval_seconds": 2.0 }
     }
   ],
   "extensions": {
