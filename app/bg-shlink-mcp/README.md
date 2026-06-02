@@ -33,6 +33,14 @@ extensions/
   extensions.json      operator-defined prompts + resources (loaded by bg-mcpcore)
 ```
 
+`extensions/` deliberately sits **outside `src/`**: everything under `src/`
+(`profiles/`, `static/`) ships inside the wheel and is loaded relative to the
+module, whereas `extensions.json` is operator-overridable runtime config,
+resolved via `EXTENSIONS_CONFIG_PATH` (default
+`file:///app/extensions/extensions.json`) and copied to `/app/extensions/` by
+the Dockerfile — so a deployment can mount a per-tenant catalogue without
+rebuilding the image.
+
 Inbound auth is env-driven (`AUTH_MODE`) and resolved by bg-mcpcore's built-in
 providers — there is no auth or tool code in this repo.
 
