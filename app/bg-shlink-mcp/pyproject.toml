@@ -110,9 +110,9 @@ omit = ["tests/*", "*/__init__.py"]
 [tool.coverage.report]
 # Global gate is conservative because CLI / server-lifespan / FastMCP wiring is
 # integration-tested, not unit-tested. The cross-cutting infra (auth, storage,
-# OpenAPI tool source, HTTP client + retry) is now tested once in bg-mcpcore's
-# own suite; this server's tests cover only the Shlink-specific seams (the
-# Settings subclass + the export task).
+# the OpenAPI + export tool sources, HTTP client + retry) is now tested once in
+# bg-mcpcore's own suite; this fully declarative server's tests cover only its
+# Settings subclass.
 fail_under = 60
 show_missing = true
 skip_covered = false
