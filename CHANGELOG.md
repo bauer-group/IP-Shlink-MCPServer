@@ -1,3 +1,9 @@
+## [0.12.5](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.4...v0.12.5) (2026-06-02)
+
+### 🐛 Bug Fixes
+
+* **config:** reconciled env settings after bg-mcpcore migration ([236a51c](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/236a51c65b9ef82bb8b54c3c571ea347041b5056))
+
 ## [0.12.4](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.3...v0.12.4) (2026-06-02)
 
 ### ♻️ Refactoring
