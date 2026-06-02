@@ -95,7 +95,6 @@ def env_flags(env: dict[str, str]) -> list[str]:
         "SHLINK_URL",
         "SHLINK_API_KEY",
         "SHLINK_OPENAPI_URL",
-        "SHLINK_OPENAPI_REFRESH_INTERVAL",
         "SHLINK_HTTP_TIMEOUT",
         "LOG_LEVEL",
     ]

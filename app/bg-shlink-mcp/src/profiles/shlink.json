@@ -5,7 +5,8 @@
   "instructions": "Self-hosted Shlink URL shortener. Use these tools to create, list, edit, and analyse short links, manage tags and domains, and inspect visit analytics. The server talks to Shlink server-to-server with a single API key - your caller identity is authenticated via OAuth.",
   "backend": {
     "base_url": "${env:SHLINK_URL}",
-    "api_base_path": "/rest/v3"
+    "api_base_path": "/rest/v3",
+    "http_timeout": "${env:SHLINK_HTTP_TIMEOUT:-30}"
   },
   "auth": {
     "outbound": {
