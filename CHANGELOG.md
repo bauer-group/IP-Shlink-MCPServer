@@ -1,3 +1,9 @@
+## [0.12.9](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.8...v0.12.9) (2026-07-25)
+
+### 🐛 Bug Fixes
+
+* **ci:** added the missing permissions block ([ef58188](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/ef58188316a9bc8459f674bd472db80ce96a09d7))
+
 ## [0.12.8](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.7...v0.12.8) (2026-06-23)
 
 ## [0.12.7](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.6...v0.12.7) (2026-06-16)
