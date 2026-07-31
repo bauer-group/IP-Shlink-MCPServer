@@ -1,3 +1,5 @@
+## [0.12.10](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.9...v0.12.10) (2026-07-31)
+
 ## [0.12.9](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.8...v0.12.9) (2026-07-25)
 
 ### 🐛 Bug Fixes
