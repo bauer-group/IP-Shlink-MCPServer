@@ -30,14 +30,16 @@ dependencies = [
     # modes (entra-single/-multi, google, oidc, none), encrypted OAuth-state
     # storage, logging, rate limiting, routes, the outbound client + the
     # profile/CLI surface. Pulled from GitHub (internal projects do not use PyPI
-    # for this package), pinned to a release tag for reproducibility. Extras:
+    # for this package). Pinned to an immutable COMMIT SHA rather than a tag:
+    # tags can be force-moved, and Dependabot's pip ecosystem cannot see PEP 508
+    # VCS references at all, so nothing else watches this dependency. Extras:
     #   [openapi]         - the OpenAPI tool source (the 25 Shlink REST tools)
     #   [oauth-providers] - the Entra / Google inbound providers
     #   [redis]           - the RedisStore backend for the OAuth-state store
     #   [tasks]           - docket, for the export_short_urls long-running task
     # bg-mcpcore transitively provides fastmcp / pydantic / pydantic-settings /
     # httpx / structlog / rich / cryptography / typer / py-key-value-aio.
-    "bg-mcpcore[openapi,oauth-providers,redis,tasks] @ git+https://github.com/bauer-group/LIB-BG-MCPCore.git@v1.6.0",
+    "bg-mcpcore[openapi,oauth-providers,redis,tasks] @ git+https://github.com/bauer-group/LIB-BG-MCPCore.git@582a8fd9214824e732d57cf4d62b9f88d6a47b5a",
 
     # Directly imported by this server's own code (kept explicit; also provided
     # transitively by bg-mcpcore, so the version ranges stay compatible). The
