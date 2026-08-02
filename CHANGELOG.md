@@ -1,3 +1,9 @@
+## [0.13.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.12...v0.13.0) (2026-08-02)
+
+### 🚀 Features
+
+* **spec:** updated bundled Shlink OpenAPI spec to v5.1.5 ([df9e81e](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/df9e81ef31d486130dc8750477298c10adcdca8d)), closes [#7](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/7) [#7](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/7)
+
 ## [0.12.12](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.11...v0.12.12) (2026-08-02)
 
 ### 🐛 Bug Fixes
