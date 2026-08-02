@@ -72,6 +72,10 @@
       "total_pages_path": "shortUrls.pagination.pagesCount",
       "formats": ["csv", "json"],
       "task": { "mode": "required", "poll_interval_seconds": 2.0 }
+    },
+    {
+      "source": "python",
+      "register": "tool_schema_compat:register"
     }
   ],
   "extensions": {

@@ -232,6 +232,24 @@ Two fixes, pick the one that matches your update cadence:
    The spec is loaded once at startup (bg-mcpcore does not poll for changes), so
    restart the container after changing it.
 
+### `API Error: 400 tools.N.custom.input_schema.properties: Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'`
+
+Fixed in 0.12.12 ([#7](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/7)) —
+upgrade the image. On older builds every request in the session fails, not just
+tool calls: Anthropic validates the whole `tools` array and rejects all of it on
+one bad key. The only workaround there is removing the server from the MCP config.
+
+Cause: Shlink's spec names three query parameters with PHP array brackets
+(`tags[]` on `GET /short-urls` and `DELETE /tags`, `excludeTags[]` on
+`GET /short-urls`), and those brackets are illegal in a JSON-Schema property key.
+[tool_schema_compat.py](../app/bg-shlink-mcp/src/tool_schema_compat.py) now
+rewrites the keys to `tags` / `excludeTags` while keeping `tags[]=a&tags[]=b` on
+the wire — PHP needs the brackets to build an array, so dropping them from the
+request would silently narrow the filter to the last value.
+
+**What changed for callers:** the tool arguments are `tags` and `excludeTags`.
+Nothing else moves; the values are still plain string arrays.
+
 ---
 
 ## Reverse proxy
