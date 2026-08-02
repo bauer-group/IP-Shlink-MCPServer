@@ -1,3 +1,9 @@
+## [0.12.12](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.11...v0.12.12) (2026-08-02)
+
+### 🐛 Bug Fixes
+
+* **tools:** sanitized bracketed OpenAPI parameter names ([ac486c1](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/ac486c151b6fa7e9a5ca2715808a2b45f1361c2f)), closes [#7](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/7)
+
 ## [0.12.11](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.10...v0.12.11) (2026-08-02)
 
 ### 🐛 Bug Fixes
