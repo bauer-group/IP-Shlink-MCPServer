@@ -208,25 +208,37 @@ surfaces the detail to the client as-is. If recurring, tighten the tool
 description in the profile's `descriptions` map
 ([profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json)).
 
-### Wrong tool surface after a Shlink upgrade
+### Wrong tool surface for the Shlink version you run
 
-The baked-in spec is pinned at image-build time. If your Shlink instance
-runs a newer version than the image was built against, new endpoints won't
-appear as MCP tools and removed endpoints will still be listed.
+The baked-in spec is pinned at image-build time (default `v5.1.5`), so it can
+describe a different API than your instance serves. It cuts both ways:
 
-Two fixes, pick the one that matches your update cadence:
+- **Instance newer than the spec** — new endpoints don't appear as tools, and
+  endpoints dropped upstream are still listed (calling them 404s).
+- **Instance older than the spec** — tools exist for endpoints the server
+  doesn't have (404), and query filters the server predates are *silently
+  ignored*: Shlink reads only the query keys it declares, so the call succeeds
+  and simply returns an unfiltered result set. That is the one to watch — it
+  produces a wrong answer rather than an error.
+
+The measured version matrix is in the README's
+[Supported Versions](../README.md#supported-versions) section. Short version:
+anything from **v4.6.0 through v5.1.5 needs no pin at all** — the endpoint and
+parameter sets are identical across that entire range.
+
+If you are outside it, two fixes, pick the one that matches your update cadence:
 
 1. **Rebuild the image with the matching version** (recommended for pinned
    stacks):
 
    ```bash
-   docker build --build-arg SHLINK_OPENAPI_VERSION=v5.1.0 -t bg-shlink-mcp .
+   docker build --build-arg SHLINK_OPENAPI_VERSION=v4.6.0 -t bg-shlink-mcp .
    ```
 
 2. **Point at a different spec source** (no rebuild — picked up on restart):
 
    ```ini
-   SHLINK_OPENAPI_URL=https://raw.githubusercontent.com/shlinkio/shlink/v5.1.0/docs/swagger/swagger.json
+   SHLINK_OPENAPI_URL=https://raw.githubusercontent.com/shlinkio/shlink/v4.6.0/docs/swagger/swagger.json
    ```
 
    The spec is loaded once at startup (bg-mcpcore does not poll for changes), so

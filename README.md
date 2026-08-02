@@ -182,9 +182,37 @@ IP-Shlink-MCPServer/
 | Component | Tested | Notes |
 | --- | --- | --- |
 | Python | 3.13 / 3.14 | Container ships 3.14 Alpine |
-| Shlink | v3.x / v4.x / v5.x | OpenAPI spec baked in at build time (default `v5.0.1`, pin via `SHLINK_OPENAPI_VERSION` build-arg) |
-| FastMCP | ≥ 2.13 | `OIDCProxy`, `AzureProvider`, `GoogleProvider` |
+| Shlink | v4.6.0 – v5.1.5 (exact) · v3.7.x / v4.5.x (degraded) | OpenAPI spec baked in at build time (default `v5.1.5`, pin via `SHLINK_OPENAPI_VERSION` build-arg or point `SHLINK_OPENAPI_URL` at a live spec) — see below |
+| FastMCP | ≥ 3.0, < 4.0 | `OIDCProxy`, `AzureProvider`, `GoogleProvider` (pulled transitively via bg-mcpcore) |
 | Redis | 7.x / 8.x | OAuth client storage (recommended for production) — disk-backed fallback works without Redis |
+
+### Running against an older Shlink
+
+The tool surface is generated from a spec pinned at build time, so it can differ
+from what your instance actually serves. Measured against the bundled specs:
+
+| Instance | Behaviour with the default `v5.1.5` spec |
+| --- | --- |
+| **v4.6.0 – v5.1.5** | Identical. Endpoint and parameter sets do not differ anywhere in this range — the only spec change across it is the `browser` redirect-rule condition type added in v5.1.x. Nothing to pin. |
+| **v4.5.x** | Works, minus four filters the server predates: `domain` on the three visit endpoints, and `apiKeyName` / `excludeTags` / `excludeTagsMode` on `list_short_urls`. Shlink reads only the query keys it declares, so these are ignored — the call succeeds, the filter just does not narrow anything. |
+| **v3.7.x** | As above, plus `get_redirect_rules` / `set_redirect_rules` return 404 (redirect rules arrived in v4). |
+
+Pin the matching tag whenever a silently-ignored filter would be worse than a
+missing tool — the failure mode is a wrong result set, not an error:
+
+```bash
+docker build --build-arg SHLINK_OPENAPI_VERSION=v4.6.0 -t bg-shlink-mcp .
+```
+
+Or point at a live spec without rebuilding (read once at startup, so restart
+after changing it):
+
+```ini
+SHLINK_OPENAPI_URL=https://raw.githubusercontent.com/shlinkio/shlink/v4.6.0/docs/swagger/swagger.json
+```
+
+Note that pinning a **4.x** spec also adds `GET /{shortCode}/qr-code`, which
+Shlink dropped from the spec in v5.0.0.
 
 ---
 

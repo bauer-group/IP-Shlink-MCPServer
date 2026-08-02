@@ -10,8 +10,9 @@
 #   docker build --target test -t bg-shlink-mcp-test .    # run tests
 #   docker build -t bg-shlink-mcp .                       # full pipeline (test gates production)
 #
-# Pin a different Shlink spec version (defaults to the value below):
-#   docker build --build-arg SHLINK_OPENAPI_VERSION=v5.1.0 -t bg-shlink-mcp .
+# Pin a different Shlink spec version (defaults to the value below) — e.g. to
+# match an older instance exactly:
+#   docker build --build-arg SHLINK_OPENAPI_VERSION=v4.6.0 -t bg-shlink-mcp .
 # =============================================================================
 
 # ── Stage 1a: Spec — fetch + bundle Shlink OpenAPI spec at BUILD time ────────
@@ -23,7 +24,16 @@
 # via --build-arg SHLINK_OPENAPI_VERSION=v5.x.y.
 FROM python:3.14-alpine AS spec
 
-ARG SHLINK_OPENAPI_VERSION=v5.0.1
+# Default = newest Shlink release we track. Safe against OLDER instances too:
+# the endpoint + parameter sets are byte-identical from v4.6.0 through v5.1.5,
+# so the generated tool surface is the same for every server in that range.
+# Below v4.6.0 the spec carries a handful of query filters the server predates
+# (`domain` on the visits endpoints, `apiKeyName` / `excludeTags[]` /
+# `excludeTagsMode` on GET /short-urls). Shlink reads only the query keys it
+# declares, so those are ignored rather than rejected — the call succeeds but
+# the extra filter does not apply. Pin the matching tag when that silence
+# matters. See README "Supported Versions" for the measured matrix.
+ARG SHLINK_OPENAPI_VERSION=v5.1.5
 
 # Note: we use `git clone` instead of the tag tarball because Shlink's
 # `.gitattributes` marks docs/ as export-ignore — the archive served at
