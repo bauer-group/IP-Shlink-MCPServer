@@ -1,3 +1,9 @@
+## [0.12.11](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.10...v0.12.11) (2026-08-02)
+
+### 🐛 Bug Fixes
+
+* **deps:** pinned bg-mcpcore to the Sentry credential-leak fix ([93f9011](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/93f9011a1ada061a789f2e810e81cf164f2d6f52))
+
 ## [0.12.10](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.9...v0.12.10) (2026-07-31)
 
 ## [0.12.9](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.8...v0.12.9) (2026-07-25)
