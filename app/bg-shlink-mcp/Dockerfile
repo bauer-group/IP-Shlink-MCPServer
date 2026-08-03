@@ -55,8 +55,9 @@ RUN python3 /usr/local/bin/bundle-openapi.py /spec/raw/swagger.json /spec/shlink
 # ── Stage 1b: Builder — install Python dependencies into a relocatable prefix ──
 FROM python:3.14-alpine AS builder
 
-# git is required to resolve the bg-mcpcore dependency, which is pulled from a
-# pinned GitHub tag (git+https://…@vX.Y.Z) rather than PyPI.
+# git is required to resolve the bg-mcpcore dependency, which is pulled from
+# GitHub (git+https://…@main) rather than PyPI. Tracking a branch means this
+# layer resolves to whatever main holds at BUILD time, not at commit time.
 RUN apk add --no-cache build-base libffi-dev git
 
 WORKDIR /build
@@ -73,8 +74,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # ── Stage 2: Test — run pytest; image build fails on any test failure ────────
 FROM python:3.14-alpine AS test
 
-# git: the test stage installs bg-mcpcore from its GitHub tag too, so the exact
-# dependency exercised in CI is the one shipped in production.
+# git: the test stage resolves bg-mcpcore the same way the builder does, so the
+# exact library exercised by the tests is the one shipped in production — which
+# matters more now that it tracks a moving branch.
 RUN apk add --no-cache build-base libffi-dev git
 
 WORKDIR /app
