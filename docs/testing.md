@@ -380,7 +380,7 @@ CLI subcommand:
 
 ```bash
 # Liveness probe (200 + {"status":"ok"} once the server is up)
-docker exec bg-shlink-mcp curl -fsS http://localhost:8000/healthz
+docker exec bg-shlink-mcp curl -fsS http://localhost:8080/healthz
 
 # Run the pytest suite (also gates the Docker build)
 docker exec bg-shlink-mcp pytest -q
@@ -510,7 +510,7 @@ a fresh OAuth round trip.
 | Inspector against local source checkout (stdio) | `npx @modelcontextprotocol/inspector python src/main.py serve --transport stdio` |
 | Same as above, FastMCP sugar | `fastmcp dev src/main.py` |
 | Headless CI smoke test | `npx @modelcontextprotocol/inspector --cli <url> --method tools/list` |
-| Container liveness probe | `docker exec bg-shlink-mcp curl -fsS http://localhost:8000/healthz` |
+| Container liveness probe | `docker exec bg-shlink-mcp curl -fsS http://localhost:8080/healthz` |
 | Container test suite | `docker exec bg-shlink-mcp pytest -q` |
 | Unit test with in-memory transport | `from fastmcp import Client; async with Client(mcp) as c: ...` |
 | Public unauth-surface sanity (curl) | `curl -fsS $HOST/.well-known/oauth-protected-resource \| jq .` |

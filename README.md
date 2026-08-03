@@ -46,7 +46,7 @@
                                     │
                                     ▼
         ┌──────────────────────────────────────────────────────────┐
-        │   bg-shlink-mcp container  (FastMCP, port 8000)          │
+        │   bg-shlink-mcp container  (FastMCP, port 8080)          │
         │   ┌────────────────────────────────────────────────────┐ │
         │   │  Inbound auth (RFC 9728 / OAuth 2.1, PKCE)         │ │
         │   │   /.well-known/oauth-protected-resource            │ │

@@ -280,9 +280,18 @@ event-stream framing FastMCP uses.
 
 ### Coolify 502 Bad Gateway
 
-The application port mismatch. The compose file `expose`s `8000`; Coolify
+The application port mismatch. The compose file `expose`s `8080`; Coolify
 auto-detects this. If you changed `MCP_PORT`, update the `expose:` block
 too.
+
+**Upgrading from a release before this port move:** the container port changed
+from `8000` to `8080`. The compose files were updated together, so a stack
+deployed from them stays consistent. What does *not* update itself is a proxy
+target configured OUTSIDE the compose file — a Coolify service whose port was
+pinned by hand, or a Traefik label in a separate file. Those still point at
+`8000` and will 502 until repointed. A deployment that sets `MCP_PORT`
+explicitly in its environment is unaffected: the variable wins over the new
+default.
 
 ---
 
@@ -300,7 +309,7 @@ Rich-coloured output, useful locally. In prod keep `LOG_FORMAT=json`.
 ### Probe server liveness from inside the container
 
 ```bash
-docker exec bg-shlink-mcp curl -fsS http://localhost:8000/healthz
+docker exec bg-shlink-mcp curl -fsS http://localhost:8080/healthz
 ```
 
 Returns `{"status": "ok"}` once the MCP server is up — the unauthenticated

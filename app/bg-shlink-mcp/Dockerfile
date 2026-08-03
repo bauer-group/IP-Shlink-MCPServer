@@ -158,24 +158,30 @@ COPY --chown=mcp:mcp extensions/ /app/extensions/
 RUN mkdir -p /app/data/oauth-storage \
     && chown -R mcp:mcp /app/data
 
+# MCP_PORT is pinned here rather than left to the library default so the image
+# is coherent on its own: `docker run` with no environment must land the server
+# and the HEALTHCHECK below on the SAME port. Setting only EXPOSE and the
+# healthcheck leaves the app on bg-mcpcore's own default, and the container then
+# reports unhealthy while serving perfectly well.
 ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    MCP_PORT=8080
 
 USER mcp
-EXPOSE 8000
+EXPOSE 8080
 
 # /healthz returns 200 OK as soon as the FastMCP lifespan reports ready.
 # Distinct from Shlink's /health (which sits behind the OAuth wall).
 #
-# Shell-form CMD so ${MCP_PORT:-8000} is expanded by /bin/sh at runtime —
+# Shell-form CMD so ${MCP_PORT:-8080} is expanded by /bin/sh at runtime —
 # matches the variable bind port in main.py. The :-8000 fallback covers
 # the bare `docker run` case where MCP_PORT isn't set; Compose stacks
 # already pass MCP_PORT explicitly. Note Compose's healthcheck block
 # replaces this one entirely when present, so this is the fallback for
 # image consumers who don't use our Compose files.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:${MCP_PORT:-8000}/healthz || exit 1
+    CMD curl -fsS http://localhost:${MCP_PORT:-8080}/healthz || exit 1
 
 # tini as PID 1 forwards SIGTERM cleanly to the python process so `docker stop`
 # triggers a graceful FastMCP lifespan shutdown instead of a 10s SIGKILL wait.
