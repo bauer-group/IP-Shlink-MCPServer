@@ -39,7 +39,7 @@ dependencies = [
     #   [tasks]           - docket, for the export_short_urls long-running task
     # bg-mcpcore transitively provides fastmcp / pydantic / pydantic-settings /
     # httpx / structlog / rich / cryptography / typer / py-key-value-aio.
-    "bg-mcpcore[openapi,oauth-providers,redis,tasks] @ git+https://github.com/bauer-group/LIB-BG-MCPCore.git@582a8fd9214824e732d57cf4d62b9f88d6a47b5a",
+    "bg-mcpcore[openapi,oauth-providers,redis,tasks] @ git+https://github.com/bauer-group/LIB-BG-MCPCore.git@main",
 
     # Directly imported by this server's own code (kept explicit; also provided
     # transitively by bg-mcpcore, so the version ranges stay compatible). The
