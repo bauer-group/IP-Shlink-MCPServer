@@ -1,3 +1,13 @@
+## [1.0.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.13.0...v1.0.0) (2026-08-03)
+
+### ⚠ BREAKING CHANGES
+
+* moved the container port to 8080, host stays 8000
+
+### 🔨 Build
+
+* moved the container port to 8080, host stays 8000 ([153f9f9](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/153f9f9e81e51a1bc5f2c1fc78bec4ed235929f1))
+
 ## [0.13.0](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v0.12.12...v0.13.0) (2026-08-02)
 
 ### 🚀 Features
