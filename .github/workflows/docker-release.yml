@@ -53,17 +53,27 @@ jobs:
       scan-directory: '.'
       severity: 'error'
 
+  # The Python gate: ruff + mypy --strict + pytest with coverage enforced.
+  # Listed in the release job's `needs` below, so no tag, GitHub Release or
+  # CHANGELOG entry can be cut while the suite is red. Before this, the Python
+  # suite ran only inside the Docker test stage — in the job that runs AFTER
+  # the release — so a red main was versioned first and failed second.
+  quality:
+    name: 🧪 Tests
+    uses: ./.github/workflows/tests.yml
+
   # ============================================
   # Release Job (only on main branch push)
   # ============================================
 
   release:
     name: 📦 Create Semantic Release
-    needs: [validate-compose, validate-scripts]
+    needs: [validate-compose, validate-scripts, quality]
     if: |
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       needs.validate-compose.result == 'success' &&
-      needs.validate-scripts.result == 'success'
+      needs.validate-scripts.result == 'success' &&
+      needs.quality.result == 'success'
     uses: bauer-group/automation-templates/.github/workflows/modules-semantic-release.yml@main
     with:
       target-branch: 'main'
@@ -108,11 +118,12 @@ jobs:
 
   docker-build-bg-shlink-mcp-pr:
     name: 🔨 Validate bg-shlink-mcp Build (PR)
-    needs: [validate-compose, validate-scripts]
+    needs: [validate-compose, validate-scripts, quality]
     if: |
       github.event_name == 'pull_request' &&
       needs.validate-compose.result == 'success' &&
-      needs.validate-scripts.result == 'success'
+      needs.validate-scripts.result == 'success' &&
+      needs.quality.result == 'success'
     uses: bauer-group/automation-templates/.github/workflows/docker-build.yml@main
     with:
       publish-to: 'ghcr'
