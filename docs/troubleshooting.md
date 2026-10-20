@@ -201,6 +201,24 @@ docker exec bg-shlink-mcp curl -fsS \
   ${SHLINK_URL}/rest/v3/short-urls?itemsPerPage=1
 ```
 
+### `health` fails with `HTTP 404` (`Cannot GET …/v3/rest/health!`)
+
+Fixed in 1.0.7 — upgrade the image. Shlink's spec documents its health probe
+only at the unversioned `/rest/health`, the one REST path outside
+`/rest/v{version}`. Older builds joined it onto the `/rest/v3` API base, so every
+call went to `/rest/v3/rest/health` (Shlink's 404 detail drops the `/rest`
+prefix, hence `/v3/rest/health`). The generated `shortUrl` and `trackShortUrl`
+tools failed the same way, at `/rest/v3/{shortCode}` and
+`/rest/v3/{shortCode}/track`.
+
+The `health` tool now calls `/rest/v3/health`, which Shlink serves as the same
+action. `shortUrl` and `trackShortUrl` are gone: they wrapped Shlink's public
+redirect and tracking-pixel routes, not REST operations, and a successful call
+would have recorded a visit. Look a code up with `get_short_url` instead.
+
+A `"status": "fail"` result (HTTP 503 from Shlink) means Shlink is up but cannot
+reach its database — `health` returns that document rather than erroring.
+
 ### Upstream validation error (`longUrl ...`)
 
 The LLM produced an invalid request body; Shlink replied 400 and FastMCP
@@ -315,7 +333,8 @@ docker exec bg-shlink-mcp curl -fsS http://localhost:8080/healthz
 Returns `{"status": "ok"}` once the MCP server is up — the unauthenticated
 `/healthz` route wired into the Docker HEALTHCHECK. (The former `health` CLI
 subcommand was removed in the bg-mcpcore migration; for upstream Shlink
-reachability, check the server logs or call a read-only tool via the Inspector.)
+reachability, call the `health` tool via the Inspector — it returns Shlink's own
+health document, `"status": "fail"` when Shlink cannot reach its database.)
 
 ### Inspect the live tool catalogue
 

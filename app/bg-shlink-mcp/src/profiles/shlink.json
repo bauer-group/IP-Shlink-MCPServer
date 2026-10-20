@@ -25,7 +25,8 @@
         "strip_path_prefix": "/rest/v{version}"
       },
       "route_maps": [
-        { "pattern": "^/health$", "type": "resource" },
+        { "pattern": "^/rest/health$", "type": "exclude" },
+        { "pattern": "^/\\{shortCode\\}", "type": "exclude" },
         { "pattern": "^/mercure-info$", "type": "exclude" },
         { "pattern": "^/rules", "type": "exclude" }
       ],
@@ -72,6 +73,10 @@
       "total_pages_path": "shortUrls.pagination.pagesCount",
       "formats": ["csv", "json"],
       "task": { "mode": "required", "poll_interval_seconds": 2.0 }
+    },
+    {
+      "source": "python",
+      "register": "health_tool:register"
     },
     {
       "source": "python",

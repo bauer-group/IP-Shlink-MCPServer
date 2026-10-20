@@ -304,9 +304,10 @@ diagnosing a stuck flow.
 
 ### 3.3 · What to verify after connecting
 
-- The **tool count** is 26 (25 auto-derived from Shlink's OpenAPI spec +
-  the `export_short_urls` task).
-- A **read-only call** (`list_short_urls`, `get_visits`) succeeds.
+- The **tool count** is 24 (22 auto-derived from Shlink's OpenAPI spec +
+  the `health` tool + the `export_short_urls` task).
+- A **read-only call** (`list_short_urls`, `health`) succeeds — `health`
+  returns Shlink's own health document (`"status": "pass"`).
 - A **write call** (`create_short_url`) succeeds *and* the new code is
   visible in the Shlink web UI — confirms both directions of the data
   pipeline.
@@ -413,8 +414,8 @@ async def test_list_short_urls_returns_results():
         assert "shortUrls" in result.data
 ```
 
-For unit tests of the Shlink-specific seams (the Settings subclass, the export
-task) without building the whole app, see the patterns under
+For unit tests of the Shlink-specific seams (the Settings subclass, the `health`
+tool, the schema-compat pass) without building the whole app, see the patterns under
 [tests/](../app/bg-shlink-mcp/tests/) — the upstream calls are stubbed there.
 
 ### Direct JSON-RPC with `curl` / `httpie`

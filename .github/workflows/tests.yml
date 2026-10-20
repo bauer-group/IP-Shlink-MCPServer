@@ -22,10 +22,11 @@
 #
 #  REQUIREMENTS
 #    None beyond read access. bg-mcpcore installs from its public GitHub repo.
-#    Note this gate does NOT build the OpenAPI tool surface: that spec is cloned
-#    from Shlink upstream during the Docker build (see the Dockerfile and
-#    scripts/bundle-openapi.py), so it is not present in a plain checkout. The
-#    Docker build remains the place where the generated tool surface is proven.
+#    Note this gate does NOT build the REAL OpenAPI tool surface: that spec is
+#    cloned from Shlink upstream during the Docker build (see the Dockerfile and
+#    scripts/bundle-openapi.py), so it is not present in a plain checkout
+#    (tests/test_tool_paths.py pins the path invariants against a stand-in spec).
+#    The Docker build remains the place where the generated tool surface is proven.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: 🧪 Tests

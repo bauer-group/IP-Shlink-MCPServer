@@ -30,7 +30,7 @@ just never populates the two differently. This module does — after the OpenAPI
 source has built the tools, it rewrites the illegal schema keys and repoints
 the parameter map at the original bracketed wire names.
 
-Wired in as the profile's third tool source (``"source": "python"``), which the
+Wired in as the profile's last tool source (``"source": "python"``), which the
 assembler runs AFTER the constructing OpenAPI source, so every generated tool is
 already present. It adds no tools of its own and returns 0.
 

@@ -33,7 +33,7 @@ dependencies = [
     # for this package). Pinned to an immutable COMMIT SHA rather than a tag:
     # tags can be force-moved, and Dependabot's pip ecosystem cannot see PEP 508
     # VCS references at all, so nothing else watches this dependency. Extras:
-    #   [openapi]         - the OpenAPI tool source (the 25 Shlink REST tools)
+    #   [openapi]         - the OpenAPI tool source (the 22 Shlink REST tools)
     #   [oauth-providers] - the Entra / Google inbound providers
     #   [redis]           - the RedisStore backend for the OAuth-state store
     #   [tasks]           - docket, for the export_short_urls long-running task
@@ -43,7 +43,8 @@ dependencies = [
 
     # Directly imported by this server's own code (kept explicit; also provided
     # transitively by bg-mcpcore, so the version ranges stay compatible). The
-    # server is now fully declarative — only the Settings subclass remains Python:
+    # server is profile-driven — its own Python is the Settings subclass plus two
+    # small tool sources (health_tool, tool_schema_compat):
     "pydantic>=2.10.0,<3.0.0",      # Settings fields
     "pydantic-settings>=2.14.1,<3.0.0",  # NoDecode on the CSV-list fields
 
@@ -113,8 +114,9 @@ omit = ["tests/*", "*/__init__.py"]
 # Global gate is conservative because CLI / server-lifespan / FastMCP wiring is
 # integration-tested, not unit-tested. The cross-cutting infra (auth, storage,
 # the OpenAPI + export tool sources, HTTP client + retry) is now tested once in
-# bg-mcpcore's own suite; this fully declarative server's tests cover only its
-# Settings subclass.
+# bg-mcpcore's own suite; this server's tests cover its Settings subclass, its
+# two python tool sources (health_tool, tool_schema_compat), the landing page
+# and the Dockerfile port wiring.
 fail_under = 60
 show_missing = true
 skip_covered = false

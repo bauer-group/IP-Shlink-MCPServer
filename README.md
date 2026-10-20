@@ -142,6 +142,8 @@ IP-Shlink-MCPServer/
 │       ├── src/                     ← Python package (PYTHONPATH=/app/src)
 │       │   ├── main.py              ← make_cli() entrypoint (serve)
 │       │   ├── config.py            ← Settings(BaseMcpSettings): backend + per-mode auth validation
+│       │   ├── health_tool.py       ← `health` tool: Shlink's probe under /rest/v3 (python tool source)
+│       │   ├── tool_schema_compat.py ← legal schema keys for tags[] / excludeTags[] (python tool source)
 │       │   ├── profiles/
 │       │   │   └── shlink.json      ← declarative profile: backend, auth, OpenAPI tools, export, extensions
 │       │   └── static/
@@ -153,8 +155,8 @@ IP-Shlink-MCPServer/
 │   encrypted OAuth-state storage, rate limiting, structured logging, the
 │   OpenAPI→tools source, the HTTP client + retry, the /healthz · / · /logo.svg
 │   routes — lives in the shared bg-mcpcore framework (a pinned GitHub
-│   dependency), not in this repo. This server is the profile plus the one
-│   Shlink-specific seam (the bulk-export task).
+│   dependency), not in this repo. This server is the profile plus two small
+│   python tool sources: the `health` tool and the tool-schema key fix.
 │
 ├── docs/
 │   ├── SHLINK-MCP-SPEC.md           ← source spec
@@ -211,8 +213,10 @@ after changing it):
 SHLINK_OPENAPI_URL=https://raw.githubusercontent.com/shlinkio/shlink/v4.6.0/docs/swagger/swagger.json
 ```
 
-Note that pinning a **4.x** spec also adds `GET /{shortCode}/qr-code`, which
-Shlink dropped from the spec in v5.0.0.
+Note that a **4.x** spec also documents `GET /{shortCode}/qr-code`, which
+Shlink dropped from the spec in v5.0.0. Like the other public short-code routes
+it sits outside `/rest/v{version}`, so the profile excludes it and it does not
+become a tool.
 
 ---
 

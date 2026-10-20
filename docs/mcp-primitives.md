@@ -23,7 +23,7 @@ Roots · Auth · Metadata**). For each one this guide answers:
 
 | Tab | Category | Who triggers? | Status here | One-line summary |
 | --- | --- | --- | --- | --- |
-| **Tools** | Component primitive | AI in the turn | **implemented** (25 spec-driven + 1 export task) | The AI calls them to *do* something |
+| **Tools** | Component primitive | AI in the turn | **implemented** (22 spec-driven + `health` + 1 export task) | The AI calls them to *do* something |
 | **Resources** | Component primitive | User / client pins them | **implemented** (4 — config-driven) | The AI *reads* them like files |
 | **Resource Templates** | Component primitive | User picks a URI | **implemented** (6 — config-driven) | Parameterised resources (`shlink://short-url/{shortCode}`) |
 | **Prompts** | Component primitive | User picks a workflow | **implemented** (1 — config-driven) | Pre-baked multi-tool workflows (slash-command-like) |
@@ -97,9 +97,10 @@ async def list_short_urls(...) -> dict:
 
 ### Status in `bg-shlink-mcp`
 
-**Implemented — 25 tools, auto-generated from Shlink's OpenAPI.**
+**Implemented — 22 tools auto-generated from Shlink's OpenAPI, plus the
+hand-written `health` tool.**
 
-We do not hand-write tool functions. bg-mcpcore's OpenAPI tool source calls
+Apart from `health`, we do not hand-write tool functions. bg-mcpcore's OpenAPI tool source calls
 `FastMCP.from_openapi()` to walk the spec and register every operation as a
 tool, configured declaratively by the `tools` block in
 [profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json). The same
@@ -108,9 +109,16 @@ source applies four post-processing passes, all driven from that profile:
 | Pass | What it does | Profile key |
 | --- | --- | --- |
 | spec normalisation | Strips `/rest/v{version}` from paths and drops the `version` path-param so the LLM never sees it | `normalize.strip_path_prefix` |
-| route maps | Filters routes — `/mercure-info` excluded, `/health` becomes a Resource | `route_maps` |
+| route maps | Filters routes — `/mercure-info` excluded, plus the spec paths outside `/rest/v{version}` that cannot resolve against the `/rest/v3` base: `/rest/health` and the public redirect / tracking-pixel routes `/{shortCode}…` | `route_maps` |
 | name overrides | Maps `operationId`s to snake_case (`createShortUrl` → `create_short_url`) | `name_overrides` |
 | annotations | Per-HTTP-method safety hints applied via the component hook | `annotations: by_http_method` |
+
+`health` is the one exception. Shlink's spec documents its probe only at the
+unversioned `/rest/health`, which the prefix strip leaves alone, so a generated
+tool would call `/rest/v3/rest/health` and get a 404. The profile excludes that
+route, and [health_tool.py](../app/bg-shlink-mcp/src/health_tool.py) (a `python`
+tool source) registers `health` against `/rest/v3/health`, which Shlink serves
+as the same action.
 
 ### Pitfalls
 
@@ -121,7 +129,7 @@ source applies four post-processing passes, all driven from that profile:
   summaries are sometimes uninformative ("List short URLs"). The profile's
   `descriptions` map ([profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json))
   overrides them for exactly this reason on the three most-used tools.
-- **GET-as-Tool is a mild smell.** ~10 of our 25 tools are pure reads. They
+- **GET-as-Tool is a mild smell.** ~13 of our 24 tools are pure reads. They
   work as tools, but a Resource Template would be cheaper in tokens and
   semantically more honest. See §3.
 
@@ -758,13 +766,13 @@ async def create_short_url(...): ...
 
 | Field | Usage |
 | --- | --- |
-| `annotations` | All 25 OpenAPI tools, via the profile's `annotations: by_http_method` (bg-mcpcore applies the per-HTTP-method hints) |
+| `annotations` | All 22 OpenAPI tools, via the profile's `annotations: by_http_method` (bg-mcpcore applies the per-HTTP-method hints); the hand-written `health` tool sets the same GET hints itself |
 | `tags` | Spec-derived (from each operation's OpenAPI `tags`). The pre-migration uniform `{"shlink"}` tag is no longer applied — it was redundant metadata on a single-purpose server |
 | `description` | Spec-derived + 3 overrides from the profile's `descriptions` map |
 | `version` | Not set per-tool (the server has one image version; tools inherit) |
 | `icons` | Not set |
 | `_meta` | Not set |
-| `title` | Not set (clients display the `name`) |
+| `title` | Set only on the two non-OpenAPI tools (`health` → "Shlink Health", `export_short_urls` → "Export Short URLs"); OpenAPI tools have none, so clients display the `name` |
 
 ### Pitfalls
 
@@ -889,7 +897,8 @@ Sorted by value-to-effort ratio. Updated as features land.
 
 ### Done
 
-- ✅ **Spec-derived tool surface** — 25 tools from Shlink's OpenAPI
+- ✅ **Spec-derived tool surface** — 22 tools from Shlink's OpenAPI (plus the
+  hand-written `health` tool)
 - ✅ **Resource Templates** for read-only GETs (5 templates layered next
   to the original tools)
 - ✅ **Static Resources** for catalogue endpoints (4 — tags, domains,
