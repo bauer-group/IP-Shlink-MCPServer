@@ -20,21 +20,13 @@ route maps and the python tool sources are the real ones.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 import respx
-from bg_mcpcore import build_app_from_profile, load_profile
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
-
-from config import Settings
-
-_APP_ROOT = Path(__file__).resolve().parent.parent
-PROFILE_PATH = _APP_ROOT / "src" / "profiles" / "shlink.json"
 
 SHLINK_URL = "http://shlink:8080"  # what the base_none_env fixture sets
 HEALTH_URL = f"{SHLINK_URL}/rest/v3/health"
@@ -64,12 +56,9 @@ PASS_BODY = {"status": "pass", "version": "5.1.7", "links": {"about": "https://s
 
 
 @pytest.fixture
-async def shlink_mcp(base_none_env, tmp_path: Path) -> FastMCP:  # type: ignore[no-untyped-def]
+async def shlink_mcp(build_shlink_mcp) -> FastMCP:  # type: ignore[no-untyped-def]
     """The server assembled the way main.py does, from the stand-in spec."""
-    spec_file = tmp_path / "shlink.json"
-    spec_file.write_text(json.dumps(SPEC), encoding="utf-8")
-    base_none_env.setenv("SHLINK_OPENAPI_URL", spec_file.as_uri())
-    return await build_app_from_profile(load_profile(str(PROFILE_PATH)), Settings(), version="test")
+    return await build_shlink_mcp(SPEC)
 
 
 @pytest.fixture

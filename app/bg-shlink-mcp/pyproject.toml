@@ -33,7 +33,7 @@ dependencies = [
     # for this package). Pinned to an immutable COMMIT SHA rather than a tag:
     # tags can be force-moved, and Dependabot's pip ecosystem cannot see PEP 508
     # VCS references at all, so nothing else watches this dependency. Extras:
-    #   [openapi]         - the OpenAPI tool source (the 22 Shlink REST tools)
+    #   [openapi]         - the OpenAPI tool source (the 21 Shlink REST tools)
     #   [oauth-providers] - the Entra / Google inbound providers
     #   [redis]           - the RedisStore backend for the OAuth-state store
     #   [tasks]           - docket, for the export_short_urls long-running task

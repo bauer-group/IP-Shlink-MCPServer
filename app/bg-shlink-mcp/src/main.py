@@ -1,7 +1,7 @@
 """bg-shlink-mcp — CLI entrypoint.
 
 A profile-driven bg-mcpcore server. Nearly everything lives in
-``profiles/shlink.json``: the 22 OpenAPI tools, the ``export_short_urls``
+``profiles/shlink.json``: the 21 OpenAPI tools, the ``export_short_urls``
 bulk-export task (the ``export`` tool source), the prompt + resource catalogue,
 all five inbound auth modes, and the static X-Api-Key outbound auth. Two small
 ``python`` tool sources cover what the profile cannot express: ``health_tool``

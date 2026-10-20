@@ -10,15 +10,18 @@ bg-mcpcore's per-class settings cache so each test parses fresh.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 # Make the src layout importable without an install step (`from config import …`).
-_SRC = Path(__file__).resolve().parent.parent / "src"
+_APP_ROOT = Path(__file__).resolve().parent.parent
+_SRC = _APP_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
@@ -94,6 +97,34 @@ def base_entra_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     }.items():
         monkeypatch.setenv(key, value)
     return monkeypatch
+
+
+@pytest.fixture
+def build_shlink_mcp(
+    base_none_env: pytest.MonkeyPatch, tmp_path: Path
+) -> Callable[[dict[str, Any]], Awaitable[Any]]:
+    """Assemble the server the way main.py does, from a stand-in OpenAPI spec.
+
+    Shlink's real spec is cloned during the Docker build and is not in a plain
+    checkout, so tests hand in a minimal spec instead. Everything else is real:
+    the profile (route maps, name + description overrides, python tool sources)
+    and the extensions catalogue.
+    """
+    from bg_mcpcore import build_app_from_profile, load_profile
+
+    from config import Settings
+
+    async def _build(spec: dict[str, Any]) -> Any:
+        spec_file = tmp_path / "shlink.json"
+        spec_file.write_text(json.dumps(spec), encoding="utf-8")
+        base_none_env.setenv("SHLINK_OPENAPI_URL", spec_file.as_uri())
+        base_none_env.setenv(
+            "EXTENSIONS_CONFIG_PATH", (_APP_ROOT / "extensions" / "extensions.json").as_uri()
+        )
+        profile = load_profile(str(_SRC / "profiles" / "shlink.json"))
+        return await build_app_from_profile(profile, Settings(), version="test")
+
+    return _build
 
 
 @pytest.fixture

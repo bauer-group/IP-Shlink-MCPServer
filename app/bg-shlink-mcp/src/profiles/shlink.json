@@ -27,6 +27,7 @@
       "route_maps": [
         { "pattern": "^/rest/health$", "type": "exclude" },
         { "pattern": "^/\\{shortCode\\}", "type": "exclude" },
+        { "pattern": "^/short-urls/shorten$", "type": "exclude" },
         { "pattern": "^/mercure-info$", "type": "exclude" },
         { "pattern": "^/rules", "type": "exclude" }
       ],

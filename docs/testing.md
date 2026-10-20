@@ -304,7 +304,7 @@ diagnosing a stuck flow.
 
 ### 3.3 · What to verify after connecting
 
-- The **tool count** is 24 (22 auto-derived from Shlink's OpenAPI spec +
+- The **tool count** is 23 (21 auto-derived from Shlink's OpenAPI spec +
   the `health` tool + the `export_short_urls` task).
 - A **read-only call** (`list_short_urls`, `health`) succeeds — `health`
   returns Shlink's own health document (`"status": "pass"`).

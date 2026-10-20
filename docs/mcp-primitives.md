@@ -23,7 +23,7 @@ Roots · Auth · Metadata**). For each one this guide answers:
 
 | Tab | Category | Who triggers? | Status here | One-line summary |
 | --- | --- | --- | --- | --- |
-| **Tools** | Component primitive | AI in the turn | **implemented** (22 spec-driven + `health` + 1 export task) | The AI calls them to *do* something |
+| **Tools** | Component primitive | AI in the turn | **implemented** (21 spec-driven + `health` + 1 export task) | The AI calls them to *do* something |
 | **Resources** | Component primitive | User / client pins them | **implemented** (4 — config-driven) | The AI *reads* them like files |
 | **Resource Templates** | Component primitive | User picks a URI | **implemented** (6 — config-driven) | Parameterised resources (`shlink://short-url/{shortCode}`) |
 | **Prompts** | Component primitive | User picks a workflow | **implemented** (1 — config-driven) | Pre-baked multi-tool workflows (slash-command-like) |
@@ -97,7 +97,7 @@ async def list_short_urls(...) -> dict:
 
 ### Status in `bg-shlink-mcp`
 
-**Implemented — 22 tools auto-generated from Shlink's OpenAPI, plus the
+**Implemented — 21 tools auto-generated from Shlink's OpenAPI, plus the
 hand-written `health` tool.**
 
 Apart from `health`, we do not hand-write tool functions. bg-mcpcore's OpenAPI tool source calls
@@ -109,7 +109,7 @@ source applies four post-processing passes, all driven from that profile:
 | Pass | What it does | Profile key |
 | --- | --- | --- |
 | spec normalisation | Strips `/rest/v{version}` from paths and drops the `version` path-param so the LLM never sees it | `normalize.strip_path_prefix` |
-| route maps | Filters routes — `/mercure-info` excluded, plus the spec paths outside `/rest/v{version}` that cannot resolve against the `/rest/v3` base: `/rest/health` and the public redirect / tracking-pixel routes `/{shortCode}…` | `route_maps` |
+| route maps | Filters routes — `/mercure-info` excluded; the deprecated `/short-urls/shorten`, which reads the API key only from an `apiKey` query argument (the model would have to supply the shared key) — `create_short_url` covers it; plus the spec paths outside `/rest/v{version}` that cannot resolve against the `/rest/v3` base: `/rest/health` and the public redirect / tracking-pixel routes `/{shortCode}…` | `route_maps` |
 | name overrides | Maps `operationId`s to snake_case (`createShortUrl` → `create_short_url`) | `name_overrides` |
 | annotations | Per-HTTP-method safety hints applied via the component hook | `annotations: by_http_method` |
 
@@ -129,7 +129,7 @@ as the same action.
   summaries are sometimes uninformative ("List short URLs"). The profile's
   `descriptions` map ([profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json))
   overrides them for exactly this reason on the three most-used tools.
-- **GET-as-Tool is a mild smell.** ~13 of our 24 tools are pure reads. They
+- **GET-as-Tool is a mild smell.** ~13 of our 23 tools are pure reads. They
   work as tools, but a Resource Template would be cheaper in tokens and
   semantically more honest. See §3.
 
@@ -766,7 +766,7 @@ async def create_short_url(...): ...
 
 | Field | Usage |
 | --- | --- |
-| `annotations` | All 22 OpenAPI tools, via the profile's `annotations: by_http_method` (bg-mcpcore applies the per-HTTP-method hints); the hand-written `health` tool sets the same GET hints itself |
+| `annotations` | All 21 OpenAPI tools, via the profile's `annotations: by_http_method` (bg-mcpcore applies the per-HTTP-method hints); the hand-written `health` tool sets the same GET hints itself |
 | `tags` | Spec-derived (from each operation's OpenAPI `tags`). The pre-migration uniform `{"shlink"}` tag is no longer applied — it was redundant metadata on a single-purpose server |
 | `description` | Spec-derived + 3 overrides from the profile's `descriptions` map |
 | `version` | Not set per-tool (the server has one image version; tools inherit) |
@@ -897,7 +897,7 @@ Sorted by value-to-effort ratio. Updated as features land.
 
 ### Done
 
-- ✅ **Spec-derived tool surface** — 22 tools from Shlink's OpenAPI (plus the
+- ✅ **Spec-derived tool surface** — 21 tools from Shlink's OpenAPI (plus the
   hand-written `health` tool)
 - ✅ **Resource Templates** for read-only GETs (5 templates layered next
   to the original tools)
