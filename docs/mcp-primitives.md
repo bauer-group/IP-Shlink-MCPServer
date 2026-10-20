@@ -128,7 +128,9 @@ as the same action.
 - **A "useful description" doubles the AI's hit rate.** Shlink's spec
   summaries are sometimes uninformative ("List short URLs"). The profile's
   `descriptions` map ([profiles/shlink.json](../app/bg-shlink-mcp/src/profiles/shlink.json))
-  overrides them for exactly this reason on the three most-used tools.
+  overrides them for exactly this reason on the most-used tools, and on the
+  irreversible visit deletes (`delete_orphan_visits`, `delete_short_url_visits`),
+  whose spec text never says the data is gone for good.
 - **GET-as-Tool is a mild smell.** ~13 of our 23 tools are pure reads. They
   work as tools, but a Resource Template would be cheaper in tokens and
   semantically more honest. See §3.
@@ -768,7 +770,7 @@ async def create_short_url(...): ...
 | --- | --- |
 | `annotations` | All 21 OpenAPI tools, via the profile's `annotations: by_http_method` (bg-mcpcore applies the per-HTTP-method hints); the hand-written `health` tool sets the same GET hints itself |
 | `tags` | Spec-derived (from each operation's OpenAPI `tags`). The pre-migration uniform `{"shlink"}` tag is no longer applied — it was redundant metadata on a single-purpose server |
-| `description` | Spec-derived + 3 overrides from the profile's `descriptions` map |
+| `description` | Spec-derived, overridden per tool by the profile's `descriptions` map where the spec text misleads or omits a risk |
 | `version` | Not set per-tool (the server has one image version; tools inherit) |
 | `icons` | Not set |
 | `_meta` | Not set |

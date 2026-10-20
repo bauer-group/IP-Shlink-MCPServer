@@ -11,6 +11,7 @@ profile is the real one.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -136,3 +137,27 @@ async def test_no_tool_asks_the_model_for_the_api_key(shlink_mcp: FastMCP) -> No
         if key.lower() == "apikey"
     }
     assert not asking, f"tools that take the Shlink API key as an argument: {asking}"
+
+
+# ── destructive tools ────────────────────────────────────────────────────────
+
+SNAKE_CASE = re.compile(r"^[a-z][a-z0-9_]*$")
+VISIT_DELETES = ("delete_orphan_visits", "delete_short_url_visits")
+
+
+async def test_every_tool_name_is_snake_case(shlink_mcp: FastMCP) -> None:
+    """An operation missing from ``name_overrides`` keeps its camelCase
+    operationId — the visit deletes did, on an otherwise snake_case surface."""
+    stray = sorted(name for name in await _tools(shlink_mcp) if not SNAKE_CASE.match(name))
+    assert not stray, f"tools without a snake_case name override: {stray}"
+
+
+@pytest.mark.parametrize("name", VISIT_DELETES)
+async def test_visit_deletes_warn_that_they_are_irreversible(
+    shlink_mcp: FastMCP, name: str
+) -> None:
+    """``delete_orphan_visits`` takes no argument at all: one call wipes every
+    orphan visit on the instance, under the server's single admin key."""
+    tool = (await _tools(shlink_mcp))[name]
+    assert tool.description.startswith("IRREVERSIBLE")
+    assert tool.annotations.destructiveHint is True

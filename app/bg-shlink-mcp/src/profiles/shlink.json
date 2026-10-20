@@ -40,6 +40,8 @@
         "GET /short-urls/{shortCode}/redirect-rules": "get_redirect_rules",
         "POST /short-urls/{shortCode}/redirect-rules": "set_redirect_rules",
         "GET /short-urls/{shortCode}/visits": "get_short_url_visits",
+        "DELETE /short-urls/{shortCode}/visits": "delete_short_url_visits",
+        "DELETE /visits/orphan": "delete_orphan_visits",
         "GET /tags/{tag}/visits": "get_tag_visits",
         "GET /domains/{domain}/visits": "get_domain_visits",
         "GET /visits/non-orphan": "get_non_orphan_visits",
@@ -55,7 +57,9 @@
       "descriptions": {
         "create_short_url": "Create a new short URL. Provide longUrl (required) and optionally customSlug, tags, domain, validSince, validUntil, maxVisits, title.",
         "list_short_urls": "List short URLs, optionally filtered by search term, tags, or date range. Supports pagination via `page` and `itemsPerPage`.",
-        "get_short_url_visits": "Return paginated visit data for a single short URL. Filter by startDate, endDate, domain, excludeBots, or excludeRobots."
+        "get_short_url_visits": "Return paginated visit data for a single short URL. Filter by startDate, endDate, domain, excludeBots, or excludeRobots.",
+        "delete_orphan_visits": "IRREVERSIBLE: permanently deletes ALL orphan visits on this Shlink instance (visits to the base URL, to invalid short codes and other 404s). Takes no filter. Only call when the user explicitly asks for it.",
+        "delete_short_url_visits": "IRREVERSIBLE: permanently deletes every recorded visit of one short URL; the short URL itself stays. Only call when the user explicitly asks for it."
       },
       "annotations": "by_http_method"
     },
