@@ -11,11 +11,15 @@ profile is the real one.
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 import pytest
 from fastmcp import FastMCP
+
+PROFILE_PATH = Path(__file__).resolve().parent.parent / "src" / "profiles" / "shlink.json"
 
 
 def _query(name: str, *, required: bool = False) -> dict[str, Any]:
@@ -161,3 +165,35 @@ async def test_visit_deletes_warn_that_they_are_irreversible(
     tool = (await _tools(shlink_mcp))[name]
     assert tool.description.startswith("IRREVERSIBLE")
     assert tool.annotations.destructiveHint is True
+
+
+async def test_set_redirect_rules_says_it_replaces_the_whole_set(shlink_mcp: FastMCP) -> None:
+    """Shlink deletes every existing rule, then inserts the list it receives
+    (``ShortUrlRedirectRuleService::setRulesForShortUrl``) — a model asked to
+    "add a rule" that sends only the new one silently drops all the others."""
+    description = (await _tools(shlink_mcp))["set_redirect_rules"].description
+    assert "REPLACES" in description
+    assert "get_redirect_rules" in description
+
+
+# ── description overrides ────────────────────────────────────────────────────
+
+# A camelCase word not preceded by "." — ``pagination.totalItems`` is a response
+# field, not a parameter.
+_CAMEL_CASE_WORD = re.compile(r"(?<![.\w])[a-z]+(?:[A-Z][a-z0-9]*)+\b")
+
+
+async def test_override_descriptions_name_only_real_parameters(shlink_mcp: FastMCP) -> None:
+    """The get_short_url_visits override offered an ``excludeRobots`` filter
+    that does not exist. Checked for the tools this stand-in spec generates."""
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+    overrides = next(t for t in profile["tools"] if t["source"] == "openapi")["descriptions"]
+    tools = await _tools(shlink_mcp)
+    unknown = {
+        name: sorted(
+            set(_CAMEL_CASE_WORD.findall(text)) - set(tools[name].parameters["properties"])
+        )
+        for name, text in overrides.items()
+        if name in tools
+    }
+    assert not any(unknown.values()), f"descriptions naming parameters that do not exist: {unknown}"

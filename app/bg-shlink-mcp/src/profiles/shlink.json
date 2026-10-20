@@ -28,8 +28,7 @@
         { "pattern": "^/rest/health$", "type": "exclude" },
         { "pattern": "^/\\{shortCode\\}", "type": "exclude" },
         { "pattern": "^/short-urls/shorten$", "type": "exclude" },
-        { "pattern": "^/mercure-info$", "type": "exclude" },
-        { "pattern": "^/rules", "type": "exclude" }
+        { "pattern": "^/mercure-info$", "type": "exclude" }
       ],
       "name_overrides": {
         "POST /short-urls": "create_short_url",
@@ -57,7 +56,8 @@
       "descriptions": {
         "create_short_url": "Create a new short URL. Provide longUrl (required) and optionally customSlug, tags, domain, validSince, validUntil, maxVisits, title.",
         "list_short_urls": "List short URLs, optionally filtered by search term, tags, or date range. Supports pagination via `page` and `itemsPerPage`.",
-        "get_short_url_visits": "Return paginated visit data for a single short URL. Filter by startDate, endDate, domain, excludeBots, or excludeRobots.",
+        "get_short_url_visits": "Return paginated visit data for a single short URL. Filter by startDate, endDate, domain, or excludeBots.",
+        "set_redirect_rules": "REPLACES the whole redirect-rule set of a short URL with the given redirectRules list; the list order is the evaluation priority (first rule wins). To add or change one rule, call get_redirect_rules first and send the complete list, unchanged rules included. An empty list removes every rule.",
         "delete_orphan_visits": "IRREVERSIBLE: permanently deletes ALL orphan visits on this Shlink instance (visits to the base URL, to invalid short codes and other 404s). Takes no filter. Only call when the user explicitly asks for it.",
         "delete_short_url_visits": "IRREVERSIBLE: permanently deletes every recorded visit of one short URL; the short URL itself stays. Only call when the user explicitly asks for it."
       },
