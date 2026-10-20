@@ -4,6 +4,16 @@ All notable changes to this project are documented here. This file is maintained
 automatically by [semantic-release](https://github.com/semantic-release/semantic-release)
 on every release to `main`.
 
+## [1.0.7](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.6...v1.0.7) (2026-10-20)
+
+### 🐛 Bug Fixes
+
+* **tools:** fixed health and short-code tools returning 404 ([2a42f6e](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/2a42f6e5ad359d5c335d6b148f080332f26f3d27))
+
+### 🔧 Maintenance
+
+* update Dockerfile version to 1.0.6 ([01ba464](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/01ba464a19b00e2ef7101a5754fd1bc66f4f2e0e))
+
 ## [1.0.6](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.5...v1.0.6) (2026-10-02)
 
 ### 🔧 Maintenance
