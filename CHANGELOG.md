@@ -4,6 +4,19 @@ All notable changes to this project are documented here. This file is maintained
 automatically by [semantic-release](https://github.com/semantic-release/semantic-release)
 on every release to `main`.
 
+## [1.0.8](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.7...v1.0.8) (2026-10-20)
+
+### 🐛 Bug Fixes
+
+* **tools:** bounded the visit lists when the page size is omitted ([ade71cc](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/ade71cc0a53388975ac80ad18a681f0bd5b9ad9d))
+* **tools:** documented the redirect-rule replace semantics ([954f153](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/954f1532760ba68612478d168395b79cc6a2af7d))
+* **tools:** excluded the shorten endpoint that took the API key as input ([95caeea](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/95caeea84a632cd52819715b2b6dd7e4885de3b2))
+* **tools:** renamed the visit-delete tools and flagged them irreversible ([a331ce2](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/a331ce2f42fec1cfa9b42da8921b6a5b179721c2))
+
+### 🔧 Maintenance
+
+* update Dockerfile version to 1.0.7 ([337119a](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/337119af6eea81319f524666a20f2909cc271737))
+
 ## [1.0.7](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.6...v1.0.7) (2026-10-20)
 
 ### 🐛 Bug Fixes
