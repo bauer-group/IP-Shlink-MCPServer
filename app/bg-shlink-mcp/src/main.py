@@ -3,10 +3,11 @@
 A profile-driven bg-mcpcore server. Nearly everything lives in
 ``profiles/shlink.json``: the 21 OpenAPI tools, the ``export_short_urls``
 bulk-export task (the ``export`` tool source), the prompt + resource catalogue,
-all five inbound auth modes, and the static X-Api-Key outbound auth. Two small
+all five inbound auth modes, and the static X-Api-Key outbound auth. Three small
 ``python`` tool sources cover what the profile cannot express: ``health_tool``
-(Shlink's probe under the versioned API base) and ``tool_schema_compat`` (legal
-schema keys for the bracketed query params). ``make_cli`` builds the Typer
+(Shlink's probe under the versioned API base), ``paging_defaults`` (a bounded
+default page size for the visit lists) and ``tool_schema_compat`` (legal schema
+keys for the bracketed query params). ``make_cli`` builds the Typer
 ``serve`` command, applies the dual-stack socket patch, and assembles the FastMCP
 instance from the profile + settings. ``config.py`` adds only the typed settings
 (backend + per-mode auth validation).

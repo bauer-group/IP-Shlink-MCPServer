@@ -7,13 +7,13 @@ client-connection instructions.
 
 ## Internal Architecture
 
-This server is **declarative apart from two small python tool sources**. The cross-cutting
+This server is **declarative apart from three small python tool sources**. The cross-cutting
 infrastructure — the five inbound auth providers (Entra single/multi, Google,
 generic OIDC, none), encrypted OAuth-state storage, rate limiting, structured
 logging, the OpenAPI→tools source, the `export` task source, the HTTP client +
 retry, and the `/healthz` · `/` · `/logo.svg` routes — lives in **bg-mcpcore**
 (a pinned GitHub dependency), tested once there. This repo keeps only the
-Shlink-specific settings, the profile and those two tool sources:
+Shlink-specific settings, the profile and those three tool sources:
 
 ```text
 src/
@@ -21,6 +21,8 @@ src/
                        Entra/Google credential fields + per-mode auth validation
   health_tool.py       `health` tool: Shlink's probe at /rest/v3/health (the
                        spec documents only /rest/health, outside the API base)
+  paging_defaults.py   middleware: itemsPerPage=20 on visit-list calls that
+                       leave it out (Shlink would otherwise return every visit)
   tool_schema_compat.py  legal schema keys for the bracketed query params
                        (tags[] / excludeTags[]); wire names unchanged
   main.py              make_cli() entrypoint (serve)
@@ -47,7 +49,7 @@ rebuilding the image.
 
 Inbound auth is env-driven (`AUTH_MODE`) and resolved by bg-mcpcore's built-in
 providers — there is no auth code in this repo, and the only tool code is the
-two python tool sources above.
+three python tool sources above.
 
 Two trust boundaries that never mix:
 

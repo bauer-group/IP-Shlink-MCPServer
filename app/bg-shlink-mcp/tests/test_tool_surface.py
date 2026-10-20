@@ -16,8 +16,12 @@ import re
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
-from fastmcp import FastMCP
+import respx
+from fastmcp import Client, FastMCP
+
+from paging_defaults import DEFAULT_ITEMS_PER_PAGE, VISIT_LIST_TOOLS
 
 PROFILE_PATH = Path(__file__).resolve().parent.parent / "src" / "profiles" / "shlink.json"
 
@@ -197,3 +201,94 @@ async def test_override_descriptions_name_only_real_parameters(shlink_mcp: FastM
         if name in tools
     }
     assert not any(unknown.values()), f"descriptions naming parameters that do not exist: {unknown}"
+
+
+# ── paging ───────────────────────────────────────────────────────────────────
+
+SHLINK_REST = "http://shlink:8080/rest/v3"  # base_none_env's SHLINK_URL + api_base_path
+EMPTY_PAGE = {"visits": {"data": [], "pagination": {"currentPage": 1, "totalItems": 0}}}
+EXTENSIONS_PATH = PROFILE_PATH.parent.parent.parent / "extensions" / "extensions.json"
+
+# tool -> (arguments without a page size, upstream path)
+VISIT_LISTS: dict[str, tuple[dict[str, Any], str]] = {
+    "get_short_url_visits": ({"shortCode": "abc"}, "/short-urls/abc/visits"),
+    "get_tag_visits": ({"tag": "promo"}, "/tags/promo/visits"),
+    "get_domain_visits": ({"domain": "DEFAULT"}, "/domains/DEFAULT/visits"),
+    "get_orphan_visits": ({}, "/visits/orphan"),
+    "get_non_orphan_visits": ({}, "/visits/non-orphan"),
+}
+
+
+async def _sent_query(
+    mcp: FastMCP, tool: str, arguments: dict[str, Any], path: str, method: str = "GET"
+) -> httpx.QueryParams:
+    with respx.mock(assert_all_called=True) as upstream:
+        route = upstream.route(method=method, url=f"{SHLINK_REST}{path}").respond(
+            200, json=EMPTY_PAGE
+        )
+        async with Client(mcp) as client:
+            await client.call_tool(tool, arguments)
+    return route.calls.last.request.url.params
+
+
+def test_the_visit_lists_under_test_are_the_ones_bounded() -> None:
+    assert set(VISIT_LISTS) == VISIT_LIST_TOOLS
+
+
+@pytest.mark.parametrize("tool", sorted(VISIT_LISTS))
+async def test_visit_lists_default_to_a_bounded_page(shlink_mcp: FastMCP, tool: str) -> None:
+    """Shlink treats a missing itemsPerPage as "all items", so a bare call
+    pulled the instance's whole visit history into one tool result."""
+    arguments, path = VISIT_LISTS[tool]
+    params = await _sent_query(shlink_mcp, tool, arguments, path)
+    assert params["itemsPerPage"] == str(DEFAULT_ITEMS_PER_PAGE)
+
+
+@pytest.mark.parametrize("items_per_page", [5, -1], ids=["explicit-size", "explicit-all"])
+async def test_an_explicit_page_size_passes_through(
+    shlink_mcp: FastMCP, items_per_page: int
+) -> None:
+    params = await _sent_query(
+        shlink_mcp, "get_orphan_visits", {"itemsPerPage": items_per_page}, "/visits/orphan"
+    )
+    assert params["itemsPerPage"] == str(items_per_page)
+
+
+async def test_other_tools_get_no_page_size(shlink_mcp: FastMCP) -> None:
+    params = await _sent_query(
+        shlink_mcp, "delete_orphan_visits", {}, "/visits/orphan", method="DELETE"
+    )
+    assert "itemsPerPage" not in params
+
+
+@pytest.mark.parametrize("tool", sorted(VISIT_LISTS))
+async def test_visit_list_descriptions_state_the_default(shlink_mcp: FastMCP, tool: str) -> None:
+    description = (await _tools(shlink_mcp))[tool].description
+    assert f"{DEFAULT_ITEMS_PER_PAGE} visits per page" in description
+    assert "pagination.totalItems" in description
+
+
+def test_visit_list_resources_request_a_bounded_page() -> None:
+    """The extension resources hit the same endpoints and take no arguments."""
+    resources = json.loads(EXTENSIONS_PATH.read_text(encoding="utf-8"))["resources"]
+    # GET /visits is the instance-wide summary, not a list.
+    visit_lists = [
+        r
+        for r in resources
+        if "visits" in r["backend"]["path"] and r["backend"]["path"] != "/visits"
+    ]
+    assert len(visit_lists) == 4
+    unbounded = [
+        r["uri"]
+        for r in visit_lists
+        if not r["backend"]["path"].endswith(f"?itemsPerPage={DEFAULT_ITEMS_PER_PAGE}")
+    ]
+    assert not unbounded, f"visit-list resources without a page size: {unbounded}"
+
+
+async def test_a_templated_visit_resource_keeps_its_page_size(shlink_mcp: FastMCP) -> None:
+    with respx.mock(assert_all_called=True) as upstream:
+        route = upstream.get(f"{SHLINK_REST}/short-urls/abc/visits").respond(200, json=EMPTY_PAGE)
+        async with Client(shlink_mcp) as client:
+            await client.read_resource("shlink://short-url/abc/visits")
+    assert route.calls.last.request.url.params["itemsPerPage"] == str(DEFAULT_ITEMS_PER_PAGE)

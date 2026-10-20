@@ -143,6 +143,7 @@ IP-Shlink-MCPServer/
 │       │   ├── main.py              ← make_cli() entrypoint (serve)
 │       │   ├── config.py            ← Settings(BaseMcpSettings): backend + per-mode auth validation
 │       │   ├── health_tool.py       ← `health` tool: Shlink's probe under /rest/v3 (python tool source)
+│       │   ├── paging_defaults.py   ← itemsPerPage=20 default for the visit lists (python tool source)
 │       │   ├── tool_schema_compat.py ← legal schema keys for tags[] / excludeTags[] (python tool source)
 │       │   ├── profiles/
 │       │   │   └── shlink.json      ← declarative profile: backend, auth, OpenAPI tools, export, extensions
@@ -155,8 +156,9 @@ IP-Shlink-MCPServer/
 │   encrypted OAuth-state storage, rate limiting, structured logging, the
 │   OpenAPI→tools source, the HTTP client + retry, the /healthz · / · /logo.svg
 │   routes — lives in the shared bg-mcpcore framework (a pinned GitHub
-│   dependency), not in this repo. This server is the profile plus two small
-│   python tool sources: the `health` tool and the tool-schema key fix.
+│   dependency), not in this repo. This server is the profile plus three small
+│   python tool sources: the `health` tool, the visit-list page-size default
+│   and the tool-schema key fix.
 │
 ├── docs/
 │   ├── SHLINK-MCP-SPEC.md           ← source spec

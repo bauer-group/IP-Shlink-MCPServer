@@ -120,6 +120,14 @@ route, and [health_tool.py](../app/bg-shlink-mcp/src/health_tool.py) (a `python`
 tool source) registers `health` against `/rest/v3/health`, which Shlink serves
 as the same action.
 
+The visit lists (`get_short_url_visits`, `get_tag_visits`, `get_domain_visits`,
+`get_orphan_visits`, `get_non_orphan_visits`) carry one more safeguard. Shlink
+returns **every** visit when `itemsPerPage` is absent, so
+[paging_defaults.py](../app/bg-shlink-mcp/src/paging_defaults.py) (another
+`python` tool source) installs a middleware that fills in `itemsPerPage=20` when
+a call leaves it out; an explicit value, `-1` for "all" included, passes
+through. The descriptions say so and point counts at `pagination.totalItems`.
+
 ### Pitfalls
 
 - **Annotations are hints, not authorisation.** Clients may ignore
@@ -181,7 +189,7 @@ loaded by bg-mcpcore's extensions subsystem. Current catalogue:
 | `shlink://tags/stats` | `/tags/stats` |
 | `shlink://domains` | `/domains` |
 | `shlink://visits/summary` | `/visits` |
-| `shlink://visits/orphan` | `/visits/orphan` |
+| `shlink://visits/orphan` | `/visits/orphan?itemsPerPage=20` |
 
 Adding a new resource is a JSON edit — no Python required (see §13 for the
 config schema). The synthesised function is wired through `mcp.add_resource(...)`,
@@ -237,10 +245,14 @@ keep using the tool; clients/users that prefer pin-able URIs get the template.
 | Template URI | Backend GET |
 | --- | --- |
 | `shlink://short-url/{shortCode}` | `/short-urls/{shortCode}` |
-| `shlink://short-url/{shortCode}/visits` | `/short-urls/{shortCode}/visits` |
+| `shlink://short-url/{shortCode}/visits` | `/short-urls/{shortCode}/visits?itemsPerPage=20` |
 | `shlink://short-url/{shortCode}/redirect-rules` | `/short-urls/{shortCode}/redirect-rules` |
-| `shlink://tag/{tag}/visits` | `/tags/{tag}/visits` |
-| `shlink://domain/{domain}/visits` | `/domains/{domain}/visits` |
+| `shlink://tag/{tag}/visits` | `/tags/{tag}/visits?itemsPerPage=20` |
+| `shlink://domain/{domain}/visits` | `/domains/{domain}/visits?itemsPerPage=20` |
+
+The visit-list resources request the 20 most recent visits: Shlink returns every
+visit when `itemsPerPage` is absent, and a resource takes no arguments to narrow
+it. The matching tools page further.
 
 Validation guards against drift: bg-mcpcore's `ResourceConfig` validator
 rejects any config where the URI placeholders and the backend-path placeholders

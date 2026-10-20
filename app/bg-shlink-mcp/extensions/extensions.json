@@ -25,7 +25,7 @@
           "default": true
         }
       ],
-      "template": "Produce a ranked report of the top ${limit} short URLs by visit count over the last ${days} days.\n\nSteps:\n\n1. Use `list_short_urls` with `itemsPerPage` set high (e.g. 200) and page through every page until you have the complete inventory. Do NOT stop after the first page.\n2. For each short URL, call `get_short_url_visits` with `startDate` set to ${days} days before today and `excludeBots=${exclude_bots}`. Record the total visit count.\n3. Sort the inventory by visit count **descending** and keep the top ${limit}.\n4. Render the result as a markdown table:\n\n   | Rank | Short URL | Long URL | Visits (${days}d) | Tags |\n   |------|-----------|----------|-------------------|------|\n\n5. Below the table add a 2-3 sentence summary covering:\n   - Total visits across the top ${limit}\n   - The single biggest gainer vs. previous comparable window (if `get_visits_summary` data is available)\n   - Any short URL whose visit count is **zero** — those are candidates for review\n\nIf the inventory has fewer than ${limit} short URLs, just report all of them.\n"
+      "template": "Produce a ranked report of the top ${limit} short URLs by visit count over the last ${days} days.\n\nSteps:\n\n1. Use `list_short_urls` with `itemsPerPage` set high (e.g. 200) and page through every page until you have the complete inventory. Do NOT stop after the first page.\n2. For each short URL, call `get_short_url_visits` with `startDate` set to ${days} days before today and `excludeBots=${exclude_bots}` and `itemsPerPage=1`, and record `pagination.totalItems` as the visit count — the visit rows themselves are not needed.\n3. Sort the inventory by visit count **descending** and keep the top ${limit}.\n4. Render the result as a markdown table:\n\n   | Rank | Short URL | Long URL | Visits (${days}d) | Tags |\n   |------|-----------|----------|-------------------|------|\n\n5. Below the table add a 2-3 sentence summary covering:\n   - Total visits across the top ${limit}\n   - The single biggest gainer vs. previous comparable window (if `get_visits_summary` data is available)\n   - Any short URL whose visit count is **zero** — those are candidates for review\n\nIf the inventory has fewer than ${limit} short URLs, just report all of them.\n"
     }
   ],
 
@@ -77,12 +77,12 @@
     {
       "uri": "shlink://visits/orphan",
       "name": "Orphan Visits",
-      "description": "Visits that did not match any active short URL (404s, expired slugs, typos).",
+      "description": "The 20 most recent visits that did not match any active short URL (404s, expired slugs, typos). Use the `get_orphan_visits` tool to page further or filter.",
       "mime_type": "application/json",
       "tags": ["analytics"],
       "backend": {
         "method": "GET",
-        "path": "/visits/orphan"
+        "path": "/visits/orphan?itemsPerPage=20"
       }
     },
     {
@@ -99,12 +99,12 @@
     {
       "uri": "shlink://short-url/{shortCode}/visits",
       "name": "Short URL Visits",
-      "description": "Paginated visit log for a single short URL — IP, user agent, referer, geolocation per visit.",
+      "description": "The 20 most recent visits to a single short URL — IP, user agent, referer, geolocation per visit. Use the `get_short_url_visits` tool to page further or filter.",
       "mime_type": "application/json",
       "tags": ["analytics"],
       "backend": {
         "method": "GET",
-        "path": "/short-urls/{shortCode}/visits"
+        "path": "/short-urls/{shortCode}/visits?itemsPerPage=20"
       }
     },
     {
@@ -121,23 +121,23 @@
     {
       "uri": "shlink://tag/{tag}/visits",
       "name": "Tag Visits",
-      "description": "Aggregated visits for every short URL tagged with the given tag.",
+      "description": "The 20 most recent visits across every short URL tagged with the given tag. Use the `get_tag_visits` tool to page further or filter.",
       "mime_type": "application/json",
       "tags": ["analytics"],
       "backend": {
         "method": "GET",
-        "path": "/tags/{tag}/visits"
+        "path": "/tags/{tag}/visits?itemsPerPage=20"
       }
     },
     {
       "uri": "shlink://domain/{domain}/visits",
       "name": "Domain Visits",
-      "description": "Aggregated visits for every short URL on the given domain.",
+      "description": "The 20 most recent visits across every short URL on the given domain. Use the `get_domain_visits` tool to page further or filter.",
       "mime_type": "application/json",
       "tags": ["analytics"],
       "backend": {
         "method": "GET",
-        "path": "/domains/{domain}/visits"
+        "path": "/domains/{domain}/visits?itemsPerPage=20"
       }
     }
   ]

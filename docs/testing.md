@@ -415,7 +415,8 @@ async def test_list_short_urls_returns_results():
 ```
 
 For unit tests of the Shlink-specific seams (the Settings subclass, the `health`
-tool, the schema-compat pass) without building the whole app, see the patterns under
+tool, the visit-list page-size default, the schema-compat pass) without building
+the whole app, see the patterns under
 [tests/](../app/bg-shlink-mcp/tests/) — the upstream calls are stubbed there.
 
 ### Direct JSON-RPC with `curl` / `httpie`
