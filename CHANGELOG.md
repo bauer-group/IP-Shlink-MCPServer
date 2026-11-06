@@ -4,6 +4,13 @@ All notable changes to this project are documented here. This file is maintained
 automatically by [semantic-release](https://github.com/semantic-release/semantic-release)
 on every release to `main`.
 
+## [1.0.11](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.10...v1.0.11) (2026-11-06)
+
+### 🔧 Maintenance
+
+* **deps:** update base image redis, python-alpine [skip ci] ([1d46b62](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/1d46b62df4a5716c04898c5245b95d790761f027))
+* update Dockerfile version to 1.0.10 ([1af5e81](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/1af5e8163a098011810a8e7c9027ced0a12222c6))
+
 ## [1.0.10](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.9...v1.0.10) (2026-10-27)
 
 ### 🔧 Maintenance
