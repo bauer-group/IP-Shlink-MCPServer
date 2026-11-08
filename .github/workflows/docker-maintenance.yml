@@ -6,12 +6,13 @@
 # staying open because the trigger never fired. Per ecosystem:
 #
 # * docker (app/bg-shlink-mcp/Dockerfile) and pip (app/bg-shlink-mcp/
-#   pyproject.toml): tested - a patch update is merged once the PR run of
-#   docker-release.yml passed. That run (paths app/**) runs tests.yml and
-#   builds the image, which installs pyproject.toml and runs pytest.
+#   pyproject.toml): tested - patch and minor updates are merged once the PR
+#   run of docker-release.yml passed; majors stay manual (merge-update-types
+#   default). That run (paths app/**) runs tests.yml and builds the image,
+#   which installs pyproject.toml and runs pytest.
 # * docker-compose (docker-compose*.yml): not tested - that PR run only checks
 #   `docker compose config`. Redis is on a floating major tag, so any bump is
-#   a major update and stays open for review (merge-update-types: patch).
+#   a major update and stays open for review.
 # * github-actions and any change under .github/: never merged automatically.
 #
 # The merge uses GITHUB_TOKEN, which starts no `push` workflow: the release
