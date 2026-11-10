@@ -22,7 +22,7 @@
 # single self-contained JSON document here, before the production stage copies
 # it in. Pinned to a git tag for reproducible tool surfaces; override per-build
 # via --build-arg SHLINK_OPENAPI_VERSION=v5.x.y.
-FROM python:3.14-alpine AS spec
+FROM python:3.15-alpine AS spec
 
 # Default = newest Shlink release we track. Safe against OLDER instances too:
 # the endpoint + parameter sets are byte-identical from v4.6.0 through v5.1.5,
@@ -53,7 +53,7 @@ RUN python3 /usr/local/bin/bundle-openapi.py /spec/raw/swagger.json /spec/shlink
 
 
 # ── Stage 1b: Builder — install Python dependencies into a relocatable prefix ──
-FROM python:3.14-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 # git is required to resolve the bg-mcpcore dependency, which is pulled from
 # GitHub (git+https://…@main) rather than PyPI. Tracking a branch means this
@@ -72,7 +72,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 
 # ── Stage 2: Test — run pytest; image build fails on any test failure ────────
-FROM python:3.14-alpine AS test
+FROM python:3.15-alpine AS test
 
 # git: the test stage resolves bg-mcpcore the same way the builder does, so the
 # exact library exercised by the tests is the one shipped in production — which
@@ -102,7 +102,7 @@ RUN env -i HOME="$HOME" PATH="$PATH" PYTHONPATH="$PYTHONPATH" \
 
 
 # ── Stage 3: Production — minimal runtime image ──────────────────────────────
-FROM python:3.14-alpine AS production
+FROM python:3.15-alpine AS production
 
 # ── OCI / BAUER GROUP labels ────────────────────────────────────────────────
 LABEL vendor="BAUER GROUP"
