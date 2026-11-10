@@ -4,6 +4,16 @@ All notable changes to this project are documented here. This file is maintained
 automatically by [semantic-release](https://github.com/semantic-release/semantic-release)
 on every release to `main`.
 
+## [1.0.12](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.11...v1.0.12) (2026-11-10)
+
+### 🐛 Bug Fixes
+
+* **docker:** bump python in /app/bg-shlink-mcp ([#10](https://github.com/bauer-group/IP-Shlink-MCPServer/issues/10)) ([6cb8d7e](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/6cb8d7e9440b66408999987b92d58b821d0d3f1c))
+
+### 🔧 Maintenance
+
+* update Dockerfile version to 1.0.11 ([b331bd3](https://github.com/bauer-group/IP-Shlink-MCPServer/commit/b331bd3355e84f9eae4a9c6d367bb7eafa03f6e5))
+
 ## [1.0.11](https://github.com/bauer-group/IP-Shlink-MCPServer/compare/v1.0.10...v1.0.11) (2026-11-06)
 
 ### 🔧 Maintenance
